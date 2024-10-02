@@ -3,32 +3,6 @@ let previousFEN = "";
 let isActive = false;
 let intervalId = null;
 
-// Listen for messages from the popup or background script
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "stopBot") {
-    console.log("[BOT]: Stop command received");
-    stopFENChangeCheck();
-    sendResponse({ status: "stopped" });
-  } else if (request.action === "startBot") {
-    console.log("[BOT]: Start command received");
-    stopFENChangeCheck();
-    setTimeout(function () {
-      stopOnCheckmate();
-      getColor();
-      startFENChangeCheck();
-    }, 4000);
-    sendResponse({ status: "started" });
-  }
-});
-
-// Listen for messages from the background script
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "drawMove") {
-    const { from, to } = showStockFishMove(request.move);
-    drawArrow(from, to);
-  }
-});
-
 function startFENChangeCheck() {
   if (isActive) {
     console.log("Already active.");
@@ -334,6 +308,7 @@ function chessNotationToMatrix(chessNotation) {
 
 function showStockFishMove(message) {
   if (message.type === "move") {
+    console.log("Stockfish move:", message);
     return { from: message.from, to: message.to };
   }
 }
@@ -417,6 +392,34 @@ function clearArrows() {
     svg.removeChild(arrow); // Remove each arrow from the SVG container
   });
 }
+
+// Listen for messages from the popup or background script
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "stopBot") {
+    console.log("[BOT]: Stop command received");
+    stopFENChangeCheck();
+    sendResponse({ status: "stopped" });
+  } else if (request.action === "startBot") {
+    console.log("[BOT]: Start command received");
+    stopFENChangeCheck();
+    setTimeout(function () {
+      stopOnCheckmate();
+      getColor();
+      startFENChangeCheck();
+    }, 4000);
+    sendResponse({ status: "started" });
+  }
+});
+
+// Listen for messages from the background script
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "drawMove") {
+    if (request.move.type === "move") {
+      const { from, to } = showStockFishMove(request.move);
+      drawArrow(from, to);
+    }
+  }
+});
 
 // Initialize the extension
 getColor();

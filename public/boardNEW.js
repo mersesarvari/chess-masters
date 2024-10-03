@@ -1,25 +1,29 @@
 let mycolor = "w";
 let isActive = false;
 let intervalId = null;
-let activeColor = "w";
-let turnCounter = 0;
-
-//FENS
-let previousBoardFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
-let currentBoardFEN = previousBoardFEN;
+let moves = [];
 
 function Start() {
-  /* if (isActive) {
-    console.log("Already active.");
-    return;
+  getColor();
+  function boardHasChanged() {
+    const moveNodes = checkMoves();
+    const currentMoves = moveNodes.map((node) => node.moveText);
+    if (moves.length < currentMoves.length) {
+      clearArrows();
+      moves = currentMoves;
+      return true;
+    } else {
+      return false;
+    }
   }
 
-  isActive = true;
-  //intervalId = setInterval(checkFENChange, 100);
-  console.log("FEN change check started."); */
-  setTimeout(async function () {
-    const moveNodes = checkMoves();
-    const moves = moveNodes.map((node) => node.moveText);
+  function myTurn(moves) {
+    if (mycolor === "w" && moves.length % 2 === 0) {
+      return true;
+    }
+    return false;
+  }
+  async function showMoves(moves) {
     // Fetch POST request to the specified endpoint
     async function fetchFen() {
       try {
@@ -40,16 +44,16 @@ function Start() {
         }
 
         const data = await response.json();
-        console.log("Response from server:", data);
         return data;
       } catch (error) {
         console.error("Fetch error:", error); // Handle any errors that occur during fetch
       }
     }
 
-    const fen = await fetchFen(); // Call the fetch function
+    const { fen } = await fetchFen();
+    console.log("[API-Response-FEN]:", fen);
     //Sending FEN to bot.js
-    chrome.runtime.sendMessage(
+    /* chrome.runtime.sendMessage(
       {
         action: "sendFEN",
         fen: fen,
@@ -57,8 +61,43 @@ function Start() {
       (response) => {
         console.log(response.status);
       }
-    );
-  }, 4000);
+    ); */
+    async function postChessApi(fen) {
+      try {
+        const response = await fetch("https://chess-api.com/v1", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ fen }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        return response.json();
+      } catch (error) {
+        console.error("Error sending FEN:", error);
+        return null; // Return null or handle the error as needed
+      }
+    }
+    const apiData = await postChessApi(fen);
+    console.log("API DATA: ", apiData);
+    //Draw move
+    drawArrow(apiData.from, apiData.to);
+  }
+  if (isActive) {
+    console.log("Already active.");
+    return;
+  }
+  isActive = true;
+  intervalId = setInterval(async function () {
+    if (boardHasChanged() === true && myTurn(moves) === true) {
+      await showMoves(moves);
+    }
+  }, 100);
+  console.log("FEN change check started.");
 }
 
 function stopFENChangeCheck() {
@@ -87,58 +126,6 @@ function stopOnCheckmate() {
     }
   }, 100);
 }
-
-/* function checkFENChange() {
-  currentBoardFEN = getCurrentFEN();
-  //Checking if the board changed
-  if (previousBoardFEN === currentBoardFEN) {
-    return;
-  } else {
-    //Setting up current and previous FEN
-    const currentFEN = currentBoardFEN;
-    const previousFEN = currentBoardFEN;
-
-    //Setting previous and current
-    turnCounter++;
-    let apiResponse = null;
-
-    //Comparing previous move to current move to get what we moved and who is the active
-    chrome.runtime.sendMessage(
-      {
-        action: "compareMoves",
-        fen1: previousBoardFEN,
-        fen2: currentBoardFEN,
-      },
-      (response) => {
-        console.log(response.status, response.data);
-        if (response?.data) {
-          apiResponse = response.data;
-          //Setting the active color:
-          activeColor = apiResponse.after.split(" ")[1];
-        }
-      }
-    );
-
-    //Clearing arrows
-    clearArrows();
-
-    //Sending data after movement to analyze
-    chrome.runtime.sendMessage(
-      {
-        action: "sendFEN",
-        fen: currentFEN,
-      },
-      (response) => {
-        console.log(response.status);
-      }
-    );
-    previousFEN = currentFEN;
-    console.log("TurnCounter", turnCounter);
-    console.log("Previous fen:", previousFEN);
-    console.log("Current fen:", currentFEN);
-  }
-} */
-
 function checkMoves() {
   // Select all div elements with class 'node'
   const moves = document.querySelectorAll(".node");
@@ -157,9 +144,6 @@ function checkMoves() {
       extractedMoves.push({ dataNode, moveText });
     }
   });
-
-  // Log or return the result
-  console.log(extractedMoves);
   return extractedMoves;
 }
 
@@ -177,41 +161,6 @@ function getColor() {
   } else {
     mycolor = "w";
     console.log("You are with the white pieces.");
-  }
-}
-
-function rotateMatrix(matrix, degrees) {
-  // Helper function to rotate 90 degrees clockwise
-  function rotate90(matrix) {
-    const rows = matrix.length;
-    const cols = matrix[0].length;
-    const rotatedMatrix = Array.from({ length: cols }, () =>
-      Array(rows).fill(null)
-    );
-
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        rotatedMatrix[col][rows - 1 - row] = matrix[row][col];
-      }
-    }
-    return rotatedMatrix;
-  }
-
-  // Normalize degrees to be within 0-360
-  degrees = degrees % 360;
-
-  if (degrees === 0) {
-    return matrix; // No rotation needed
-  } else if (degrees === 90) {
-    return rotate90(matrix); // Rotate 90 degrees
-  } else if (degrees === 180) {
-    return rotate90(rotate90(matrix)); // Rotate 180 degrees
-  } else if (degrees === 270) {
-    return rotate90(rotate90(rotate90(matrix))); // Rotate 270 degrees
-  } else {
-    throw new Error(
-      "Invalid rotation value. Acceptable values are 0, 90, 180, 270."
-    );
   }
 }
 
@@ -310,25 +259,6 @@ function clearArrows() {
     svg.removeChild(arrow); // Remove each arrow from the SVG container
   });
 }
-
-// Listen for messages from the popup or background script
-/* chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "stopBot") {
-    console.log("[BOT]: Stop command received");
-    stopFENChangeCheck();
-    sendResponse({ status: "stopped" });
-  } else if (request.action === "startBot") {
-    console.log("[BOT]: Start command received");
-    stopFENChangeCheck();
-    setTimeout(function () {
-      stopOnCheckmate();
-      getColor();
-      startFENChangeCheck();
-    }, 5000);
-    sendResponse({ status: "started" });
-  }
-}); */
-
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "drawMove") {
@@ -340,6 +270,5 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // Initialize the extension
-getColor();
 Start();
 stopOnCheckmate();

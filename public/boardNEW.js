@@ -1,4 +1,4 @@
-/* let mycolor = "w";
+let mycolor = "w";
 let isActive = false;
 let intervalId = null;
 let activeColor = "w";
@@ -8,22 +8,63 @@ let turnCounter = 0;
 let previousBoardFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
 let currentBoardFEN = previousBoardFEN;
 
-function startFENChangeCheck() {
-  if (isActive) {
+function Start() {
+  /* if (isActive) {
     console.log("Already active.");
     return;
   }
 
   isActive = true;
-  intervalId = setInterval(checkFENChange, 100);
-  console.log("FEN change check started.");
+  //intervalId = setInterval(checkFENChange, 100);
+  console.log("FEN change check started."); */
+  setTimeout(async function () {
+    const moveNodes = checkMoves();
+    const moves = moveNodes.map((node) => node.moveText);
+    // Fetch POST request to the specified endpoint
+    async function fetchFen() {
+      try {
+        const response = await fetch(
+          "https://chess-master-webpage.vercel.app/api/chess",
+          {
+            // Replace with your actual endpoint
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json", // Specify content type as JSON
+            },
+            body: JSON.stringify({ moves }), // Send moves as JSON body
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log("Response from server:", data);
+        return data;
+      } catch (error) {
+        console.error("Fetch error:", error); // Handle any errors that occur during fetch
+      }
+    }
+
+    const fen = await fetchFen(); // Call the fetch function
+    //Sending FEN to bot.js
+    chrome.runtime.sendMessage(
+      {
+        action: "sendFEN",
+        fen: fen,
+      },
+      (response) => {
+        console.log(response.status);
+      }
+    );
+  }, 4000);
 }
 
 function stopFENChangeCheck() {
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;
-    previousFEN = "";
     console.log("FEN change check stopped.");
   }
 
@@ -47,7 +88,7 @@ function stopOnCheckmate() {
   }, 100);
 }
 
-function checkFENChange() {
+/* function checkFENChange() {
   currentBoardFEN = getCurrentFEN();
   //Checking if the board changed
   if (previousBoardFEN === currentBoardFEN) {
@@ -96,11 +137,31 @@ function checkFENChange() {
     console.log("Previous fen:", previousFEN);
     console.log("Current fen:", currentFEN);
   }
+} */
+
+function checkMoves() {
+  // Select all div elements with class 'node'
+  const moves = document.querySelectorAll(".node");
+
+  // Create an array to store the extracted moves
+  const extractedMoves = [];
+
+  // Loop through the selected div elements
+  moves.forEach((move) => {
+    // Extract the data-node attribute and the move text inside the span
+    const dataNode = move.getAttribute("data-node");
+    const moveText = move.querySelector("span")?.textContent.trim();
+
+    // If move text is available, store the result
+    if (moveText) {
+      extractedMoves.push({ dataNode, moveText });
+    }
+  });
+
+  // Log or return the result
+  console.log(extractedMoves);
+  return extractedMoves;
 }
-
-function CheckBoardChange() {}
-
-function checkLastMove(currentFen, previousFen) {}
 
 function getColor() {
   const board =
@@ -116,20 +177,6 @@ function getColor() {
   } else {
     mycolor = "w";
     console.log("You are with the white pieces.");
-  }
-}
-
-function getCurrentFEN() {
-  const chessBoard =
-    document.querySelector("#board-play-computer") ||
-    document.querySelector("#board-single");
-
-  if (chessBoard) {
-    const array = convertChessBoardToArray(chessBoard, 90);
-    return convertChessBoardToFEN(array);
-  } else {
-    console.error("Chess board not found.");
-    return "";
   }
 }
 
@@ -168,96 +215,6 @@ function rotateMatrix(matrix, degrees) {
   }
 }
 
-function convertChessBoardToFEN(chessBoard) {
-  const pieceMap = {
-    wr: "R",
-    wn: "N",
-    wb: "B",
-    wk: "K",
-    wq: "Q",
-    wp: "P",
-    br: "r",
-    bn: "n",
-    bb: "b",
-    bk: "k",
-    bq: "q",
-    bp: "p",
-  };
-
-  let fen = "";
-
-  for (let row of chessBoard) {
-    let emptyCount = 0; // Counter for empty squares in the row
-    for (let square of row) {
-      if (square) {
-        if (emptyCount > 0) {
-          // If there were empty squares before this piece, add their count
-          fen += emptyCount;
-          emptyCount = 0; // Reset the empty count
-        }
-        if (!pieceMap[square]) {
-          throw new Error(`Invalid piece: ${square}`);
-        }
-        fen += pieceMap[square]; // Convert piece to FEN
-      } else {
-        emptyCount++; // Increment the empty square count
-      }
-    }
-    if (emptyCount > 0) {
-      // Add the count of empty squares at the end of the row
-      fen += emptyCount;
-    }
-    fen += "/"; // Add a slash to separate rows
-  }
-
-  // Remove the trailing slash from the FEN string
-  fen = fen.slice(0, -1);
-
-  // Adding additional FEN information
-  const castlingAvailability = "-"; // No castling available for this example
-  const enPassantTargetSquare = "-"; // No en passant target square
-  const halfmoveClock = 0; // Halfmove clock
-  const fullmoveNumber = 1; // Fullmove number
-
-  // Concatenating all parts to create the final FEN string
-  const finalFEN = `${fen} ${activeColor} ${castlingAvailability} ${enPassantTargetSquare} ${halfmoveClock} ${fullmoveNumber}`;
-  return finalFEN;
-}
-
-function convertChessBoardToArray(chessBoardHTML, degree) {
-  const pieces = chessBoardHTML.querySelectorAll(".piece");
-  const board = Array.from({ length: 8 }, () => Array(8).fill(null));
-
-  pieces.forEach((piece) => {
-    const classList = piece.className.split(" ");
-
-    // Get the square class and piece type
-    const squareClass = classList.find((cls) => cls.startsWith("square-")); // e.g., square-42
-    const pieceType = classList.find((cls) => cls.length === 2); // Assuming piece types are always 2 letters long
-
-    if (squareClass && pieceType) {
-      // Get the square index from class name
-      const squareIndex = parseInt(squareClass.replace("square-", ""), 10);
-      const file = squareIndex % 10; // File (1-8 corresponds to a-h)
-      const rank = Math.floor(squareIndex / 10); // Rank (1-8 corresponds to 1-8)
-
-      // Map to board coordinates
-      const row = 8 - rank; // Convert to array index (0-7)
-      const col = file - 1; // Convert to array index (0-7)
-
-      // Place the piece in the board array
-      board[row][col] = pieceType;
-    }
-  });
-
-  // Reverse the rows of the board
-  board.forEach((row) => row.reverse());
-
-  // Rotate the board based on the given degree
-  let rotated = rotateMatrix(board, degree);
-  return rotated;
-}
-
 function chessNotationToMatrix(chessNotation) {
   const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
 
@@ -272,13 +229,6 @@ function chessNotationToMatrix(chessNotation) {
   const row = 8 - rank; // Convert rank to 0-based index (8 -> 0, 1 -> 7, etc.)
 
   return { row, col }; // Return as an object
-}
-
-function showStockFishMove(message) {
-  if (message.type === "move") {
-    //console.log("Stockfish move:", message);
-    return { from: message.from, to: message.to };
-  }
 }
 
 function drawArrow(from, to) {
@@ -310,12 +260,12 @@ function drawArrow(from, to) {
   const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
 
   // Set the attributes for the line
-  line.setAttribute("x1", fromX);
-  line.setAttribute("y1", fromY);
-  line.setAttribute("x2", adjustedToX);
-  line.setAttribute("y2", adjustedToY);
+  line.setAttribute("x1", fromX.toString());
+  line.setAttribute("y1", fromY.toString());
+  line.setAttribute("x2", adjustedToX.toString());
+  line.setAttribute("y2", adjustedToY.toString());
   line.setAttribute("stroke", "rgb(150, 190, 70)"); // Line color
-  line.setAttribute("stroke-width", lineWidth); // Line width
+  line.setAttribute("stroke-width", lineWidth.toString()); // Line width
   line.setAttribute("opacity", "0.9"); // Line opacity
   line.setAttribute("data-arrow", `${from}${to}`);
   line.setAttribute("id", `line-${from}${to}`); // Use 'line' in ID
@@ -362,7 +312,7 @@ function clearArrows() {
 }
 
 // Listen for messages from the popup or background script
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+/* chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "stopBot") {
     console.log("[BOT]: Stop command received");
     stopFENChangeCheck();
@@ -377,20 +327,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }, 5000);
     sendResponse({ status: "started" });
   }
-});
+}); */
 
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "drawMove") {
     if (request.move.type === "move") {
-      const { from, to } = showStockFishMove(request.move);
-      drawArrow(from, to);
+      //console.log("Stockfish move:", message);
+      drawArrow(request.move.from, request.move.to);
     }
   }
 });
 
 // Initialize the extension
 getColor();
-startFENChangeCheck();
+Start();
 stopOnCheckmate();
- */

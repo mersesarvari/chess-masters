@@ -25,5 +25,5 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "public/popup.js", "public/chess.js", "public/bot.js"]
+  "include": ["src", "public/popup.js", "public/board.js", "public/bot.js"]
 }

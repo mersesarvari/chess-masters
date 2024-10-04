@@ -34,8 +34,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
   if (startButton) {
     startButton.addEventListener("click", function () {
-      console.log("Start button clicked");
-      sendMessage("startBot");
+      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        chrome.tabs.sendMessage(tabs[0].id, {
+          action: "start",
+          move: apiData,
+        });
+      });
     });
   }
 

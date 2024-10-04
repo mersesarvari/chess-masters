@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { PlayIcon, CirclePause, Settings } from "lucide-react";
+import Cookies from "js-cookie";
 
 export default function App() {
   const [isBotRunning, setIsBotRunning] = useState(false);
@@ -12,8 +13,27 @@ export default function App() {
 
   const toggleBot = () => {
     setIsBotRunning(!isBotRunning);
-    // Here you would add the logic to actually start or stop the bot
   };
+
+  useEffect(() => {
+    const cookie = Cookies.get("chess-master-running");
+    if (cookie === "false" || cookie === undefined) {
+      setIsBotRunning(false);
+    } else {
+      setIsBotRunning(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    //If isRunning changes then sending start or stop command
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+      chrome.tabs.sendMessage(tabs[0].id!, {
+        action: isBotRunning ? "start" : "stop",
+      });
+    });
+    //Setting up the cookie for remembering if running or not
+    Cookies.set("chess-master-running", isBotRunning ? "true" : "false");
+  }, [isBotRunning]);
 
   return (
     <body className="bg-[#2f3437]">
@@ -34,7 +54,10 @@ export default function App() {
         <main>
           <div className="flex justify-between items-center mb-4">
             <Button
-              onClick={toggleBot}
+              onClick={() => {
+                toggleBot();
+              }}
+              id="startButton"
               className={`flex-1 ${
                 isBotRunning
                   ? "bg-red-500 hover:bg-red-600"

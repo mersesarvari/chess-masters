@@ -93,6 +93,7 @@ async function Start() {
   }
   isActive = true;
 
+  console.log("[ChessMaster]: Started");
   //Showing move if no move happened and it is my turn (Im white)
   if (myTurn(moves) === true) {
     await showMoves(moves);
@@ -103,18 +104,18 @@ async function Start() {
       await showMoves(moves);
     }
   }, 100);
-  console.log("FEN change check started.");
 }
 
-function stopFENChangeCheck() {
+function Stop() {
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;
-    console.log("FEN change check stopped.");
   }
 
+  moves = [];
   isActive = false;
   clearArrows();
+  console.log("[ChessMaster]: Stopped");
 }
 
 function stopOnCheckmate() {
@@ -275,6 +276,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// Initialize the extension
-await Start();
-stopOnCheckmate();
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "start") {
+    console.log("[BOARD:js]: Start command recieved");
+    Start();
+    stopOnCheckmate();
+  }
+});
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "stop") {
+    console.log("[BOARD:js]: stop command recieved");
+    Stop();
+    stopOnCheckmate();
+  }
+});

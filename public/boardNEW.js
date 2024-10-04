@@ -3,7 +3,7 @@ let isActive = false;
 let intervalId = null;
 let moves = [];
 
-function Start() {
+async function Start() {
   getColor();
   function boardHasChanged() {
     const moveNodes = checkMoves();
@@ -92,6 +92,12 @@ function Start() {
     return;
   }
   isActive = true;
+
+  //Showing move if no move happened and it is my turn (Im white)
+  if (myTurn(moves) === true) {
+    await showMoves(moves);
+  }
+  //Showing moves if a move happened and it is my turn!
   intervalId = setInterval(async function () {
     if (boardHasChanged() === true && myTurn(moves) === true) {
       await showMoves(moves);
@@ -270,5 +276,5 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // Initialize the extension
-Start();
+await Start();
 stopOnCheckmate();

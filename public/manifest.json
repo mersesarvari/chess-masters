@@ -3,10 +3,9 @@
   "name": "Chess Analysis Bot",
   "version": "1.0",
   "description": "A chess analysis bot for browser-based chess games",
-  "permissions": ["activeTab", "scripting"],
+  "permissions": ["activeTab", "scripting", "storage"],
   "background": {
-    "service_worker": "bot.js",
-    "type": "module"
+    "service_worker": "bot.js"
   },
   "content_scripts": [
     {

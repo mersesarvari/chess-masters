@@ -75,3 +75,42 @@ async function fetchMoveComparison(fen1, fen2) {
     console.error("Fetch error:", error);
   }
 }
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "login") {
+    console.log(
+      `[AUTH:js]: ${request.action} command received! Email:${request.email} Password:${request.password}`
+    );
+    login(request.email, request.password, sendResponse);
+    return true; // Keep the message channel open for async response
+  }
+});
+
+async function login(email, password, sendResponse) {
+  try {
+    const response = await fetch(
+      "https://chess-master-webpage.vercel.app/api/login",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email,
+          password: password,
+        }),
+      }
+    );
+    if (response.ok) {
+      await chrome.storage.local.set({ email, password });
+      console.log("Login successful");
+      sendResponse({ status: "Login successful", success: true });
+    } else {
+      console.error("Login failed:", response);
+      sendResponse({ status: "Login failed", success: false });
+    }
+  } catch (error) {
+    console.error("Login error:", error);
+    sendResponse({ status: `Login failed: ${error}`, success: false });
+  }
+}

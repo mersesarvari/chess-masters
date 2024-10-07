@@ -55,7 +55,7 @@ async function Start() {
     }
 
     const { fen } = await fetchFen();
-    console.log("[API-Response-FEN]:", fen);
+    //console.log("[API-Response-FEN]:", fen);
     //Sending FEN to bot.js
     /* chrome.runtime.sendMessage(
       {
@@ -87,7 +87,7 @@ async function Start() {
       }
     }
     const apiData = await postChessApi(fen);
-    console.log("API DATA: ", apiData);
+    //console.log("API DATA: ", apiData);
     //Draw move
     drawArrow(apiData.from, apiData.to);
   }
@@ -200,6 +200,7 @@ async function stopOnCheckmate() {
           } finally {
             Stop();
             console.log("[BOARD.js]: Stopped on checkmate");
+            isStopOnCheckmateActive = false;
           }
         });
       }

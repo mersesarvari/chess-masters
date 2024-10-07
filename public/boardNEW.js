@@ -203,7 +203,7 @@ async function stopOnCheckmate() {
           }
         });
       }
-    }, 1000); // Check every 1000 milliseconds (1 second)
+    }, 100); // Check every 1000 milliseconds (1 second)
   }
 }
 

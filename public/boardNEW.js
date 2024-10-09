@@ -44,7 +44,7 @@ async function Start() {
         );
 
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          throw new Error(`HTTP error! status: ${response}`);
         }
 
         const data = await response.json();
@@ -228,9 +228,20 @@ function checkMoves() {
 
   // Loop through the selected div elements
   moves.forEach((move) => {
+    let moveText = "";
     // Extract the data-node attribute and the move text inside the span
     const dataNode = move.getAttribute("data-node");
-    const moveText = move.querySelector("span")?.textContent.trim();
+    //Checkin if the span has a span with the moving piece icon:
+    const pieceIcon = move?.querySelector("span[data-figurine]");
+    //If it has an icon, extract the text
+    if (pieceIcon === null) {
+      moveText = move.querySelector("span")?.textContent.trim();
+    } else {
+      const iconValue = pieceIcon.getAttribute("data-figurine");
+      moveText = `${iconValue}${move
+        .querySelector("span")
+        ?.textContent.trim()}`;
+    }
 
     // If move text is available, store the result
     if (moveText) {
@@ -239,7 +250,6 @@ function checkMoves() {
   });
   return extractedMoves;
 }
-
 function getColor() {
   const board =
     document.querySelector("#board-play-computer") ||

@@ -58,7 +58,7 @@ async function fetchMoveComparison(fen1, fen2) {
   if (!fen1 || !fen2) {
     throw new Error("[fetchMoveComparison] fen1 or fen2 are required");
   }
-  const url = `https://chess-master-webpage.vercel.app/api/chess?action=compare&fen1=${encodeURIComponent(
+  const url = `https://www.chessmaster.cloud/api/chess?action=compare&fen1=${encodeURIComponent(
     fen1
   )}&fen2=${encodeURIComponent(fen2)}`;
 
@@ -88,19 +88,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 async function login(email, password, sendResponse) {
   try {
-    const response = await fetch(
-      "https://chess-master-webpage.vercel.app/api/login",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: email,
-          password: password,
-        }),
-      }
-    );
+    const response = await fetch("https://www.chessmaster.cloud/api/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: email,
+        password: password,
+      }),
+    });
     if (response.ok) {
       await chrome.storage.local.set({ email, password });
       console.log("Login successful");

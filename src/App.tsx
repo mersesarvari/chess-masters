@@ -50,7 +50,7 @@ export default function App() {
   const handleRegisterClick = (e: any) => {
     e.preventDefault(); // Prevent the default link behavior
     chrome.tabs.create({
-      url: "https://chess-master-webpage.vercel.app/register",
+      url: "https://www.chessmaster.cloud/register",
     });
   };
 

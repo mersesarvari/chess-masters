@@ -32,7 +32,7 @@ async function Start() {
     async function fetchFen() {
       try {
         const response = await fetch(
-          "https://chess-master-webpage.vercel.app/api/chess",
+          "https://www.chessmaster.cloud/api/chess",
           {
             // Replace with your actual endpoint
             method: "POST",
@@ -180,7 +180,7 @@ async function stopOnCheckmate() {
           // Saving the game to the database
           try {
             const response = await fetch(
-              "https://chess-master-webpage.vercel.app/api/game",
+              "https://www.chessmaster.cloud/api/game",
               {
                 method: "POST",
                 headers: {

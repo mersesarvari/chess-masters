@@ -1,50 +1,57 @@
-# React + TypeScript + Vite
+# Chess Master Chess.com Bot
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Overview
 
-Currently, two official plugins are available:
+The Chess Masters Chess.com Bot is a real-time chess game analyzer designed to read the chess board during both Bot vs Player and Player vs Player games on Chess.com. It suggests the best moves for the player based on the current game state using advanced chess engines and AI. This bot aims to assist players in making optimal moves by providing real-time analysis and move recommendations.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Features
 
-## Expanding the ESLint configuration
+- Real-time Chess Board Reading: The bot scans and understands the chess board state, recognizing both Bot and Player moves.
+- Best Move Suggestions: Using chess engines like Stockfish, the bot evaluates the game state and suggests the best possible move.
+- Bot vs Player & Player vs Player Support: It works in both scenarios, analyzing the game in real-time, regardless of the player setup.
+- Move History Tracking: Tracks and records moves during a match for analysis and replaying.
+- Interactive UI: Provides an easy-to-use interface to view the chess board and suggested moves.
+- Chess.com Integration: Seamlessly integrates with Chess.com for live game analysis.
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+## Prerequisites
 
-- Configure the top-level `parserOptions` property like this:
+Before you begin, ensure that you have met the following requirements:
 
-```js
-export default tseslint.config({
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+- Create a chess-masters account on https://www.chessmaster.cloud/
+- Install the extension on your browser: https://www.chessmaster.cloud/setup-guide
+
+## Installation & Setup
+
+If you want to get the source code:
+
+```bash
+git clone https://github.com/mersesarvari/chess-masters.git
+cd chess-masters
 ```
 
-- Replace `tseslint.configs.recommended` to `tseslint.configs.recommendedTypeChecked` or `tseslint.configs.strictTypeChecked`
-- Optionally add `...tseslint.configs.stylisticTypeChecked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and update the config:
+## Usage
 
-```js
-// eslint.config.js
-import react from 'eslint-plugin-react'
+1. Start a Game:
+   Bot vs Player: Start a game against the Chess Masters Bot on Chess.com. The bot will automatically read the chessboard and suggest moves. You have to start hte bot after every game for safety reasons.
+   Player vs Player: During a game, the bot can read the board and suggest the best moves for both players.
+2. Game Board Display:
+   The bot will provide a visual representation of the current chess board.
+   After each move, the bot will highlight the best move suggestion.
+3. Move Suggestions:
+   For each turn, the bot will calculate the best move using the chess engine and display it.
+   The suggestions will be updated in real-time as the game progresses.
+4. Move History:
+   The bot keeps track of all moves and displays a move history for easy reference.
+   You can check your replayes on https://www.chessmaster.cloud/
 
-export default tseslint.config({
-  // Set the react version
-  settings: { react: { version: '18.3' } },
-  plugins: {
-    // Add the react plugin
-    react,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended rules
-    ...react.configs.recommended.rules,
-    ...react.configs['jsx-runtime'].rules,
-  },
-})
-```
+## Support the Developer
+
+If you enjoy using this extension and would like to support its ongoing development, you can make a donation through Ko-fi. Your support helps keep the project alive and improve future updates!
+
+[Support on Ko-fi](https://ko-fi.com/yourusername)
+
+Thank you for your support! 🙏
+
+## Contact
+
+For further questions or issues, feel free to open an issue on GitHub or contact the maintainer at merse.sarvari@gmail.com

@@ -1,4 +1,4 @@
-# Chess Master Chess.com Bot
+# [ChessMaster](https://www.chessmaster.cloud/) Chess.com Bot
 
 ## Overview
 

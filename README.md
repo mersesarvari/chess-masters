@@ -48,7 +48,7 @@ cd chess-masters
 
 If you enjoy using this extension and would like to support its ongoing development, you can make a donation through Ko-fi. Your support helps keep the project alive and improve future updates!
 
-[Support on Ko-fi](https://ko-fi.com/yourusername)
+[Support on Ko-fi](https://ko-fi.com/nazmox)
 
 Thank you for your support! 🙏
 

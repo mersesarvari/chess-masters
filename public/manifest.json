@@ -4,13 +4,14 @@
   "version": "1.0",
   "description": "A chess analysis bot for browser-based chess games",
   "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "bot.js"
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["boardNEW.js", "index.js"],
+      "js": ["index.js", "lychess-board.js"],
       "type": "module"
     }
   ],

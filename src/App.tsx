@@ -33,10 +33,13 @@ export default function App() {
 
   useEffect(() => {
     if (isLoggedIn) {
-      // Send message to the active tab
       chrome.tabs?.query(
         { active: true, currentWindow: true },
         function (tabs: any) {
+          if (tabs[0]?.url) {
+            console.log("[APP.JS]: Current URL:", tabs[0].url); // Log the URL
+          }
+          console.log("Window.location.href: ", window.window.location.href);
           chrome.tabs?.sendMessage(tabs[0].id, {
             action: isBotRunning ? "start" : "stop",
           });

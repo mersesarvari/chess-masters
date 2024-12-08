@@ -3,15 +3,18 @@ let isActive = false;
 let intervalId = null;
 let moves = [];
 let isStopOnCheckmateActive = false;
+let url = window.location.href;
+console.log("Current URL:", url);
 
+// !OK
 async function Start() {
   getColor();
   function boardHasChanged() {
-    const moveNodes = checkMoves();
-    const currentMoves = moveNodes.map((node) => node.moveText);
+    const currentMoves = checkMoves();
     if (moves.length < currentMoves.length) {
       clearArrows();
       moves = currentMoves;
+      console.log("[ MOVES ] : ", moves);
       return true;
     } else {
       return false;
@@ -55,18 +58,9 @@ async function Start() {
     }
 
     const { fen } = await fetchFen();
-    //console.log("[API-Response-FEN]:", fen);
-    //Sending FEN to bot.js
-    /* chrome.runtime.sendMessage(
-      {
-        action: "sendFEN",
-        fen: fen,
-      },
-      (response) => {
-        console.log(response.status);
-      }
-    ); */
+
     async function postChessApi(fen) {
+      console.log(`[ postChessApi ]: ${fen}`);
       try {
         const response = await fetch("https://chess-api.com/v1", {
           method: "POST",
@@ -87,10 +81,11 @@ async function Start() {
       }
     }
     const apiData = await postChessApi(fen);
-    //console.log("API DATA: ", apiData);
+    console.log("API DATA: ", apiData);
     //Draw move
     drawArrow(apiData.from, apiData.to);
   }
+
   if (isActive) {
     console.log("Already active.");
     return;
@@ -111,6 +106,7 @@ async function Start() {
   }, 100);
 }
 
+// !OK
 function Stop() {
   if (intervalId) {
     clearInterval(intervalId);
@@ -130,11 +126,17 @@ async function stopOnCheckmate() {
     isStopOnCheckmateActive = true;
     isActive = false;
     const checkInterval = setInterval(async () => {
-      // Get all the text content on the page
       const pageText = document.body.innerText || document.body.textContent;
 
+      //Options when the game ended
+      const blackWon = pageText.includes("Checkmate • Black is victorious");
+      const whiteWon = pageText.includes("Checkmate • White is victorious");
+      const gameAborted = pageText.includes("Game aborted");
+      const draw = pageText.includes("Draw");
+
       // Check if the text contains keywords indicating game over or checkmate
-      const isGameOver = pageText.includes("Game Review");
+      // ! TODO: Checking draw or stealmate
+      const isGameOver = blackWon || whiteWon || gameAborted || draw;
 
       // Check if game is over and if a winner is found
       if (isGameOver) {
@@ -143,21 +145,16 @@ async function stopOnCheckmate() {
         clearInterval(checkInterval);
         clearArrows();
 
-        const mewon = pageText.includes("You Won!");
-        const blackWon = pageText.includes("Black Won!");
-        const whiteWon = pageText.includes("White Won!");
-        const draw = pageText.includes("Draw");
-
-        let winColor = "w"; // Initialize winColor
-        if (mewon) {
-          console.log(`You won with ${mycolor}`);
-          winColor = mycolor;
-        } else if (blackWon || whiteWon) {
-          console.log(`Opponent won with ${mycolor === "w" ? "b" : "w"}`);
-          winColor = mycolor === "w" ? "b" : "w";
-        } else if (draw) {
+        winColor = "-";
+        if (whiteWon) {
+          winColor = "w";
+          console.log("[GAME ENDED]: White Won!");
+        } else if (blackWon) {
+          winColor = "b";
+          console.log("[GAME ENDED]: Black Won!");
+        } else {
           winColor = "-";
-          console.log("Draw");
+          console.log("[GAME ENDED]: Draw");
         }
 
         // Fetch email asynchronously
@@ -210,7 +207,9 @@ async function stopOnCheckmate() {
 
 function getWinner() {
   // Select the element containing the header with the winner text
-  const winnerElement = document.querySelector(".header-title-component");
+  const winnerElement = document.querySelector(
+    "#main-wrap > main > aside > div > section.status"
+  );
 
   // If the element exists, retrieve and return the text content (e.g., "White Won")
   if (winnerElement) {
@@ -219,51 +218,44 @@ function getWinner() {
     return "Winner not found";
   }
 }
+
 function checkMoves() {
-  // Select all div elements with class 'node'
-  const moves = document.querySelectorAll(".node");
+  // Select all move pairs (each `i5z` contains a number, and its sibling `kwdb` contains moves)
+  const moveNodes = document.querySelectorAll("i5z");
 
-  // Create an array to store the extracted moves
-  const extractedMoves = [];
+  // Array to store the extracted moves
+  const moves = [];
 
-  // Loop through the selected div elements
-  moves.forEach((move) => {
-    let moveText = "";
-    // Extract the data-node attribute and the move text inside the span
-    const dataNode = move.getAttribute("data-node");
-    //Checkin if the span has a span with the moving piece icon:
-    const pieceIcon = move?.querySelector("span[data-figurine]");
-    //If it has an icon, extract the text
-    if (pieceIcon === null) {
-      moveText = move.querySelector("span")?.textContent.trim();
-    } else {
-      const iconValue = pieceIcon.getAttribute("data-figurine");
-      moveText = `${iconValue}${move
-        .querySelector("span")
-        ?.textContent.trim()}`;
-    }
+  // Loop through each move number node
+  moveNodes.forEach((moveNode) => {
+    // Get the white move (first sibling `kwdb`)
+    const whiteMove = moveNode.nextElementSibling?.textContent.trim();
 
-    // If move text is available, store the result
-    if (moveText) {
-      extractedMoves.push({ dataNode, moveText });
-    }
+    // Get the black move (second sibling `kwdb`)
+    const blackMove =
+      moveNode.nextElementSibling?.nextElementSibling?.textContent.trim();
+
+    // Add moves to the list (only include if they exist)
+    if (whiteMove) moves.push(whiteMove);
+    if (blackMove) moves.push(blackMove);
   });
-  return extractedMoves;
+  //console.log("[MOVES] :", moves);
+  return moves;
 }
+
 function getColor() {
-  const board =
-    document.querySelector("#board-play-computer") ||
-    document.querySelector("#board-single");
+  const board = document.querySelector(".cg-wrap");
   if (!board) {
     console.error("Chess board not found.");
     return;
   }
-  if (board.className.includes("flipped")) {
-    mycolor = "b";
-    console.log("You are with the black pieces.");
-  } else {
+  // Check if the next element has the "manipulated" attribute
+  if (board && board.className.includes("orientation-white")) {
     mycolor = "w";
     console.log("You are with the white pieces.");
+  } else {
+    mycolor = "b";
+    console.log("You are with the black pieces.");
   }
 }
 
@@ -284,25 +276,41 @@ function chessNotationToMatrix(chessNotation) {
 }
 
 function drawArrow(from, to) {
-  const svg = document.querySelector(".arrows"); // Get the SVG container
+  let isFlipped = mycolor === "b";
+
+  console.log(`[ DrawArrow ]: ${from} ---> ${to}`);
+  const svg = document.querySelector(".cg-shapes"); // Get the SVG container
 
   // Convert chess squares to matrix coordinates
   const fromCoord = chessNotationToMatrix(from);
   const toCoord = chessNotationToMatrix(to);
 
-  // Define SVG coordinates based on the matrix coordinates
-  const fromX = fromCoord.col * 12.5 + 6.25; // Center of the square in x
-  const fromY = fromCoord.row * 12.5 + 6.25; // Center of the square in y
-  const toX = toCoord.col * 12.5 + 6.25; // Center of the square in x
-  const toY = toCoord.row * 12.5 + 6.25; // Center of the square in y
+  // Map chessboard rows and columns (0-7) to the SVG `viewBox` range (-4 to 4)
+  const mapToSvg = (value) => -4 + (value / 7) * 8;
+
+  // Adjust coordinates based on whether the board is flipped
+  const adjustRow = (row) => (isFlipped ? 7 - row : row);
+  const adjustCol = (col) => (isFlipped ? 7 - col : col);
+
+  // Correctly adjust both rows and columns for flipped boards
+  const adjustedFromRow = adjustRow(fromCoord.row);
+  const adjustedFromCol = adjustCol(fromCoord.col);
+  const adjustedToRow = adjustRow(toCoord.row);
+  const adjustedToCol = adjustCol(toCoord.col);
+
+  // Define SVG coordinates based on the adjusted matrix coordinates
+  const fromX = mapToSvg(adjustedFromCol);
+  const fromY = mapToSvg(adjustedFromRow); // Correctly flipped Y-axis
+  const toX = mapToSvg(adjustedToCol);
+  const toY = mapToSvg(adjustedToRow); // Correctly flipped Y-axis
 
   // Calculate angle for the arrow
   const angle = Math.atan2(toY - fromY, toX - fromX);
 
   // Define the arrowhead size and line width
-  const arrowHeadSize = 3; // Smaller size of the arrowhead
-  const lineWidth = 1; // Thinner line width
-  const lineLengthAdjustment = arrowHeadSize * 0.75; // Adjust this value as needed for line length
+  const arrowHeadSize = 0.3; // Scaled down for the SVG's coordinate system
+  const lineWidth = 0.1; // Thin line width for the SVG coordinate space
+  const lineLengthAdjustment = arrowHeadSize * 0.75;
 
   // Calculate adjusted end points for the line
   const adjustedToX = toX - lineLengthAdjustment * Math.cos(angle);
@@ -316,9 +324,9 @@ function drawArrow(from, to) {
   line.setAttribute("y1", fromY.toString());
   line.setAttribute("x2", adjustedToX.toString());
   line.setAttribute("y2", adjustedToY.toString());
-  line.setAttribute("stroke", "rgb(150, 190, 70)"); // Line color
+  line.setAttribute("stroke", "rgb(16, 31, 163)"); // Line color
   line.setAttribute("stroke-width", lineWidth.toString()); // Line width
-  line.setAttribute("opacity", "0.9"); // Line opacity
+  line.setAttribute("opacity", "1"); // Line opacity
   line.setAttribute("data-arrow", `${from}${to}`);
   line.setAttribute("id", `line-${from}${to}`); // Use 'line' in ID
 
@@ -331,7 +339,7 @@ function drawArrow(from, to) {
     "polygon"
   );
 
-  // Define points for the arrowhead
+  // Define points for the arrowhead (adjusted for the smaller SVG scale)
   const arrowheadPoints = `
           0,0 
           -${arrowHeadSize},${arrowHeadSize / 2} 
@@ -340,8 +348,8 @@ function drawArrow(from, to) {
 
   // Set the attributes for the arrowhead
   arrowhead.setAttribute("points", arrowheadPoints);
-  arrowhead.setAttribute("fill", "rgb(150, 190, 70)"); // Color of the arrowhead
-  arrowhead.setAttribute("opacity", "0.9"); // Arrowhead opacity
+  arrowhead.setAttribute("fill", "rgb(16, 31, 163)"); // Color of the arrowhead
+  arrowhead.setAttribute("opacity", "1"); // Arrowhead opacity
   arrowhead.setAttribute("data-arrowhead", `${from}${to}`);
   arrowhead.setAttribute("id", `arrowhead-${from}${to}`); // Use 'arrowhead' in ID
 
@@ -354,14 +362,16 @@ function drawArrow(from, to) {
   // Append the arrowhead to the SVG container
   svg.appendChild(arrowhead);
 }
+
 function clearArrows() {
-  const svg = document.querySelector(".arrows"); // Get the SVG container
+  const svg = document.querySelector(".cg-shapes"); // Get the SVG container
   const arrows = svg.querySelectorAll("line, polygon"); // Select all lines and polygons (arrows)
 
   arrows.forEach((arrow) => {
     svg.removeChild(arrow); // Remove each arrow from the SVG container
   });
 }
+
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "drawMove") {

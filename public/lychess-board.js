@@ -129,8 +129,8 @@ async function stopOnCheckmate() {
       const pageText = document.body.innerText || document.body.textContent;
 
       //Options when the game ended
-      const blackWon = pageText.includes("Checkmate • Black is victorious");
-      const whiteWon = pageText.includes("Checkmate • White is victorious");
+      const blackWon = pageText.includes("Black is victorious");
+      const whiteWon = pageText.includes("White is victorious");
       const gameAborted = pageText.includes("Game aborted");
       const draw = pageText.includes("Draw");
 

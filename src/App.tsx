@@ -33,18 +33,9 @@ export default function App() {
 
   useEffect(() => {
     if (isLoggedIn) {
-      chrome.tabs?.query(
-        { active: true, currentWindow: true },
-        function (tabs: any) {
-          if (tabs[0]?.url) {
-            console.log("[APP.JS]: Current URL:", tabs[0].url); // Log the URL
-          }
-          console.log("Window.location.href: ", window.window.location.href);
-          chrome.tabs?.sendMessage(tabs[0].id, {
-            action: isBotRunning ? "start" : "stop",
-          });
-        }
-      );
+      chrome.runtime.sendMessage({
+        action: isBotRunning ? "start" : "stop",
+      });
       // Store the bot running status in chrome storage
       chrome.storage.local.set({ running: isBotRunning });
     }

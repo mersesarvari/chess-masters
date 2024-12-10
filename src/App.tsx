@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function App() {
+  const [versionOk, setVersionOk] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isBotRunning, setIsBotRunning] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -29,6 +30,45 @@ export default function App() {
         setIsBotRunning(result.running);
       }
     });
+  }, []);
+
+  //Version checker
+  useEffect(() => {
+    // Define an async function inside useEffect
+    const fetchData = async () => {
+      const url = "https://www.chessmaster.cloud/api/version";
+
+      const requestData = {
+        version: "1.0.0",
+      };
+
+      try {
+        // Make the POST request
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestData),
+        });
+
+        // Parse the response as JSON
+        const data = await response.json();
+        if (data.status === 200) {
+          setVersionOk(true);
+        } else {
+          setVersionOk(false);
+        }
+
+        console.log("Response:", data); // Handle the response data
+      } catch (error) {
+        setVersionOk(false);
+        console.error("Error:", error); // Handle any errors
+      }
+    };
+
+    // Call the async function
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -86,7 +126,7 @@ export default function App() {
       <header className="flex items-center justify-between mb-4">
         <div className="flex items-center">
           <ChessIcon className="w-6 h-6 mr-2 text-[#7fa650]" />
-          <h1 className="text-xl font-bold">Chess Analysis Bot</h1>
+          <h1 className="text-xl font-bold">Chess Master Bot</h1>
         </div>
         {isLoggedIn && (
           <Button
@@ -100,133 +140,157 @@ export default function App() {
       </header>
 
       <main>
-        {!isLoggedIn ? (
-          <Card className="bg-[#1a1a1a]">
-            <CardHeader>
-              <CardTitle className="text-[#7fa650]">Login</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <label htmlFor="email" className="text-sm text-gray-400">
-                    Email
-                  </label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="bg-[#2f3437] border-[#424242] text-white"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="password" className="text-sm text-gray-400">
-                    Password
-                  </label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className="bg-[#2f3437] border-[#424242] text-white"
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full bg-[#7fa650] hover:bg-[#6c8c44]"
-                >
-                  <LogIn className="w-4 h-4 mr-2" />
-                  Log In
-                </Button>
-              </form>
-              <div className="mt-4 text-center">
-                <span className="text-sm text-gray-400">
-                  Don't have an account?
-                </span>
-                <a
-                  href="#"
-                  onClick={handleRegisterClick} // Handle click event
-                  className="text-sm text-[#7fa650] hover:underline ml-1"
-                >
-                  Register here
-                </a>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
+        {!versionOk ? (
           <>
             <div className="flex justify-between items-center mb-4">
               <Button
-                onClick={toggleBot}
+                onClick={() => {
+                  window.open(
+                    "https://www.chessmaster.cloud/#download",
+                    "_blank"
+                  );
+                }}
                 id="startButton"
-                className={`flex-1 ${
-                  isBotRunning
-                    ? "bg-red-500 hover:bg-red-600"
-                    : "bg-[#7fa650] hover:bg-[#6c8c44]"
-                }`}
+                className={`flex-1 bg-red-500 hover:bg-red-600`}
               >
-                {isBotRunning ? (
-                  <>
-                    <CirclePause className="w-4 h-4 mr-2" />
-                    Stop Bot
-                  </>
-                ) : (
-                  <>
-                    <PlayIcon className="w-4 h-4 mr-2" />
-                    Start Bot
-                  </>
-                )}
+                Outdated version! Click here to upgrade!
               </Button>
             </div>
-
-            <div className="bg-[#1a1a1a] p-3 rounded-md mb-4">
-              <h2 className="text-sm font-semibold mb-2">Status</h2>
-              <p className="text-sm">
-                {isBotRunning
-                  ? "Bot is analyzing the current position..."
-                  : "Bot is inactive. Press Start to begin analysis."}
-              </p>
-            </div>
-
-            {showSettings && (
-              <div className="bg-[#1a1a1a] p-3 rounded-md mb-4">
-                <h2 className="text-sm font-semibold mb-2">Settings</h2>
-                <div className="flex items-center justify-between mb-2">
-                  <label htmlFor="depth" className="text-sm">
-                    Analysis Depth
-                  </label>
-                  <Slider
-                    id="depth"
-                    min={1}
-                    max={20}
-                    step={1}
-                    value={[depth]}
-                    onValueChange={(value) => setDepth(value[0])}
-                    className="w-32"
-                  />
-                  <span className="text-sm ml-2">{depth}</span>
+          </>
+        ) : (
+          <>
+            {!isLoggedIn ? (
+              <Card className="bg-[#1a1a1a]">
+                <CardHeader>
+                  <CardTitle className="text-[#7fa650]">Login</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div className="space-y-2">
+                      <label htmlFor="email" className="text-sm text-gray-400">
+                        Email
+                      </label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="bg-[#2f3437] border-[#424242] text-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="password"
+                        className="text-sm text-gray-400"
+                      >
+                        Password
+                      </label>
+                      <Input
+                        id="password"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        className="bg-[#2f3437] border-[#424242] text-white"
+                      />
+                    </div>
+                    <Button
+                      type="submit"
+                      className="w-full bg-[#7fa650] hover:bg-[#6c8c44]"
+                    >
+                      <LogIn className="w-4 h-4 mr-2" />
+                      Log In
+                    </Button>
+                  </form>
+                  <div className="mt-4 text-center">
+                    <span className="text-sm text-gray-400">
+                      Don't have an account?
+                    </span>
+                    <a
+                      href="#"
+                      onClick={handleRegisterClick} // Handle click event
+                      className="text-sm text-[#7fa650] hover:underline ml-1"
+                    >
+                      Register here
+                    </a>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <div className="flex justify-between items-center mb-4">
+                  <Button
+                    onClick={toggleBot}
+                    id="startButton"
+                    className={`flex-1 ${
+                      isBotRunning
+                        ? "bg-red-500 hover:bg-red-600"
+                        : "bg-[#7fa650] hover:bg-[#6c8c44]"
+                    }`}
+                  >
+                    {isBotRunning ? (
+                      <>
+                        <CirclePause className="w-4 h-4 mr-2" />
+                        Stop Bot
+                      </>
+                    ) : (
+                      <>
+                        <PlayIcon className="w-4 h-4 mr-2" />
+                        Start Bot
+                      </>
+                    )}
+                  </Button>
                 </div>
-                <div className="flex items-center justify-between">
-                  <label htmlFor="autoPlay" className="text-sm">
-                    Auto Play Best Move
-                  </label>
-                  <Switch
-                    id="autoPlay"
-                    checked={autoPlay}
-                    onCheckedChange={setAutoPlay}
-                  />
+
+                <div className="bg-[#1a1a1a] p-3 rounded-md mb-4">
+                  <h2 className="text-sm font-semibold mb-2">Status</h2>
+                  <p className="text-sm">
+                    {isBotRunning
+                      ? "Bot is analyzing the current position..."
+                      : "Bot is inactive. Press Start to begin analysis."}
+                  </p>
                 </div>
-              </div>
+
+                {showSettings && (
+                  <div className="bg-[#1a1a1a] p-3 rounded-md mb-4">
+                    <h2 className="text-sm font-semibold mb-2">Settings</h2>
+                    <div className="flex items-center justify-between mb-2">
+                      <label htmlFor="depth" className="text-sm">
+                        Analysis Depth
+                      </label>
+                      <Slider
+                        id="depth"
+                        min={1}
+                        max={20}
+                        step={1}
+                        value={[depth]}
+                        onValueChange={(value) => setDepth(value[0])}
+                        className="w-32"
+                      />
+                      <span className="text-sm ml-2">{depth}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label htmlFor="autoPlay" className="text-sm">
+                        Auto Play Best Move
+                      </label>
+                      <Switch
+                        id="autoPlay"
+                        checked={autoPlay}
+                        onCheckedChange={setAutoPlay}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <Button
+                  onClick={handleLogout}
+                  className="w-full mt-4 bg-[#424242] hover:bg-[#3a3a3a]"
+                >
+                  Log Out
+                </Button>
+              </>
             )}
-
-            <Button
-              onClick={handleLogout}
-              className="w-full mt-4 bg-[#424242] hover:bg-[#3a3a3a]"
-            >
-              Log Out
-            </Button>
           </>
         )}
       </main>

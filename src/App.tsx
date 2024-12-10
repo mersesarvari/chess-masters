@@ -91,6 +91,7 @@ export default function App() {
         {isLoggedIn && (
           <Button
             onClick={() => setShowSettings(!showSettings)}
+            disabled
             aria-label="Settings"
           >
             <Settings className="w-5 h-5 text-[#7fa650]" />
@@ -107,8 +108,8 @@ export default function App() {
             <CardContent>
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <label htmlFor="email" className="text-sm font-medium">
-                    Username
+                  <label htmlFor="email" className="text-sm text-gray-400">
+                    Email
                   </label>
                   <Input
                     id="email"
@@ -120,7 +121,7 @@ export default function App() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label htmlFor="password" className="text-sm font-medium">
+                  <label htmlFor="password" className="text-sm text-gray-400">
                     Password
                   </label>
                   <Input

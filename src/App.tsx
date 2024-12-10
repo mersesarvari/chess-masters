@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function App() {
+  const version = "1.0.0";
   const [versionOk, setVersionOk] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isBotRunning, setIsBotRunning] = useState(false);
@@ -39,7 +40,7 @@ export default function App() {
       const url = "https://www.chessmaster.cloud/api/version";
 
       const requestData = {
-        version: "1.0.0",
+        version: version,
       };
 
       try {
@@ -296,7 +297,7 @@ export default function App() {
       </main>
 
       <footer className="mt-4 text-center text-xs text-gray-400">
-        Chess Analysis Bot v1.0
+        ChessMaster v{version}
       </footer>
     </div>
   );

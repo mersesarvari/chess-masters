@@ -2,9 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { PlayIcon, CirclePause, LogIn } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import {
+  PlayIcon,
+  PauseIcon,
+  LogInIcon,
+  LogOutIcon,
+  AlertTriangleIcon,
+} from "lucide-react";
 
 export default function App() {
   const version = "1.0.0";
@@ -14,7 +28,6 @@ export default function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  // Retrieve stored email and password from chrome storage
   useEffect(() => {
     chrome.storage.local.get(["email", "password", "running"], (result) => {
       if (result.email && result.password) {
@@ -28,42 +41,23 @@ export default function App() {
     });
   }, []);
 
-  //Version checker
   useEffect(() => {
-    // Define an async function inside useEffect
     const fetchData = async () => {
       const url = "https://www.chessmaster.cloud/api/version";
-
-      const requestData = {
-        version: version,
-      };
-
+      const requestData = { version: version };
       try {
-        // Make the POST request
         const response = await fetch(url, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(requestData),
         });
-
-        // Parse the response as JSON
         const data = await response.json();
-        if (data.status === 200) {
-          setVersionOk(true);
-        } else {
-          setVersionOk(false);
-        }
-
-        console.log("Response:", data); // Handle the response data
+        setVersionOk(data.status === 200);
       } catch (error) {
         setVersionOk(false);
-        console.error("Error:", error); // Handle any errors
+        console.error("Error:", error);
       }
     };
-
-    // Call the async function
     fetchData();
   }, []);
 
@@ -72,7 +66,6 @@ export default function App() {
       chrome.runtime.sendMessage({
         action: isBotRunning ? "start" : "stop",
       });
-      // Store the bot running status in chrome storage
       chrome.storage.local.set({ running: isBotRunning });
     }
   }, [isBotRunning, isLoggedIn]);
@@ -80,27 +73,17 @@ export default function App() {
   const handleRegisterClick = (
     e: React.MouseEvent<HTMLAnchorElement, MouseEvent>
   ) => {
-    e.preventDefault(); // Prevent the default link behavior
-    chrome.tabs.create({
-      url: "https://www.chessmaster.cloud/register",
-    });
+    e.preventDefault();
+    chrome.tabs.create({ url: "https://www.chessmaster.cloud/register" });
   };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // Sending login command to auth.js
     chrome.runtime.sendMessage(
-      {
-        action: "login",
-        email: email,
-        password: password,
-      },
+      { action: "login", email: email, password: password },
       async function (response) {
-        console.log(response);
         if (response.success) {
-          // Store email and password in chrome storage
-          setIsLoggedIn(true); // Update login state
-          console.log("[APP.js]: Login successful");
+          setIsLoggedIn(true);
           await chrome.storage.local.set({ email, password });
         }
       }
@@ -109,116 +92,151 @@ export default function App() {
 
   const handleLogout = () => {
     setIsLoggedIn(false);
-    chrome.storage.local.remove(["email", "password", "running"]); // Remove from chrome storage
+    chrome.storage.local.remove(["email", "password", "running"]);
     setIsBotRunning(false);
-    setEmail(""); // Clear email state on logout
-    setPassword(""); // Clear password state on logout
+    setEmail("");
+    setPassword("");
   };
 
   return (
-    <div className="w-80 p-4 bg-[#2f3437] text-white">
+    <div className="w-80 p-4 bg-[#2f3437] text-white min-h-[400px]">
       <header className="flex items-center justify-between mb-4">
-        <div className="flex items-center">
-          <ChessIcon className="w-6 h-6 mr-2 text-[#7fa650]" />
-          <h1 className="text-xl font-bold">Chess Master Bot</h1>
+        <div className="flex items-center space-x-2">
+          <ChessIcon className="w-6 h-6 text-[#7fa650]" />
+          <div>
+            <h1 className="text-xl font-bold">Chess Master Bot</h1>
+            <p className="text-xs text-gray-400">v{version}</p>
+          </div>
         </div>
+        {isLoggedIn && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleLogout}
+            className="text-gray-400 hover:text-white"
+          >
+            <LogOutIcon className="w-5 h-5" />
+          </Button>
+        )}
       </header>
 
       <main>
         {!versionOk ? (
-          <>
-            <div className="flex justify-between items-center mb-4">
+          <Card className="bg-[#1a1a1a] border-red-700">
+            <CardHeader>
+              <CardTitle className="text-red-400 flex items-center">
+                <AlertTriangleIcon className="w-5 h-5 mr-2" />
+                Outdated Version
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-300 mb-4">
+                Your Chess Master Bot is outdated. Please update to continue
+                using the extension.
+              </p>
               <Button
-                onClick={() => {
+                onClick={() =>
                   window.open(
                     "https://www.chessmaster.cloud/#download",
                     "_blank"
-                  );
-                }}
-                id="startButton"
-                className={`flex-1 bg-red-500 hover:bg-red-600`}
+                  )
+                }
+                className="w-full bg-red-600 hover:bg-red-700 text-white"
               >
-                Outdated version! Click here to upgrade!
+                Update Now
               </Button>
-            </div>
-          </>
+            </CardContent>
+          </Card>
+        ) : !isLoggedIn ? (
+          <Card className="bg-[#1a1a1a] border-[#424242]">
+            <CardHeader>
+              <CardTitle className="text-[#7fa650]">Welcome Back</CardTitle>
+              <CardDescription className="text-gray-400">
+                Login to access Chess Master Bot
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="bg-[#2f3437] border-[#424242] text-white placeholder-gray-400"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="bg-[#2f3437] border-[#424242] text-white placeholder-gray-400"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full bg-[#7fa650] hover:bg-[#6c8c44] text-white"
+                >
+                  <LogInIcon className="w-4 h-4 mr-2" />
+                  Log In
+                </Button>
+              </form>
+              <div className="mt-4 text-center">
+                <span className="text-sm text-gray-400">
+                  Don't have an account?
+                </span>
+                <a
+                  href="#"
+                  onClick={handleRegisterClick}
+                  className="text-sm text-[#7fa650] hover:text-[#6c8c44] ml-1"
+                >
+                  Register here
+                </a>
+              </div>
+            </CardContent>
+          </Card>
         ) : (
-          <>
-            {!isLoggedIn ? (
-              <Card className="bg-[#1a1a1a]">
+          <Tabs defaultValue="control" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 bg-[#1a1a1a]">
+              <TabsTrigger
+                value="control"
+                className="data-[state=active]:bg-[#2f3437]"
+              >
+                Control
+              </TabsTrigger>
+              <TabsTrigger
+                value="status"
+                className="data-[state=active]:bg-[#2f3437]"
+              >
+                Status
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="control" className="mt-4">
+              <Card className="bg-[#1a1a1a] border-[#424242]">
                 <CardHeader>
-                  <CardTitle className="text-[#7fa650]">Login</CardTitle>
+                  <CardTitle className="text-[#7fa650]">Bot Control</CardTitle>
+                  <CardDescription className="text-gray-400">
+                    Manage your Chess Master Bot
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <form onSubmit={handleLogin} className="space-y-4">
-                    <div className="space-y-2">
-                      <label htmlFor="email" className="text-sm text-gray-400">
-                        Email
-                      </label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        className="bg-[#2f3437] border-[#424242] text-white"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="password"
-                        className="text-sm text-gray-400"
-                      >
-                        Password
-                      </label>
-                      <Input
-                        id="password"
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        className="bg-[#2f3437] border-[#424242] text-white"
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      className="w-full bg-[#7fa650] hover:bg-[#6c8c44]"
-                    >
-                      <LogIn className="w-4 h-4 mr-2" />
-                      Log In
-                    </Button>
-                  </form>
-                  <div className="mt-4 text-center">
-                    <span className="text-sm text-gray-400">
-                      Don't have an account?
-                    </span>
-                    <a
-                      href="#"
-                      onClick={handleRegisterClick} // Handle click event
-                      className="text-sm text-[#7fa650] hover:underline ml-1"
-                    >
-                      Register here
-                    </a>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                <div className="flex justify-between items-center mb-4">
                   <Button
-                    onClick={() => {
-                      setIsBotRunning((prev) => !prev);
-                    }}
-                    id="startButton"
-                    className={`flex-1 ${
+                    onClick={() => setIsBotRunning((prev) => !prev)}
+                    className={`w-full ${
                       isBotRunning
-                        ? "bg-red-500 hover:bg-red-600"
+                        ? "bg-red-600 hover:bg-red-700"
                         : "bg-[#7fa650] hover:bg-[#6c8c44]"
-                    }`}
+                    } text-white`}
                   >
                     {isBotRunning ? (
                       <>
-                        <CirclePause className="w-4 h-4 mr-2" />
+                        <PauseIcon className="w-4 h-4 mr-2" />
                         Stop Bot
                       </>
                     ) : (
@@ -228,30 +246,42 @@ export default function App() {
                       </>
                     )}
                   </Button>
-                </div>
-
-                <div className="bg-[#1a1a1a] p-3 rounded-md mb-4">
-                  <h2 className="text-sm font-semibold mb-2">Status</h2>
-                  <p className="text-sm">
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="status" className="mt-4">
+              <Card className="bg-[#1a1a1a] border-[#424242]">
+                <CardHeader>
+                  <CardTitle className="text-[#7fa650]">Bot Status</CardTitle>
+                  <CardDescription className="text-gray-400">
+                    Current activity of your bot
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-300">
+                      Status:
+                    </span>
+                    <Badge
+                      variant={isBotRunning ? "default" : "secondary"}
+                      className="bg-[#7fa650] text-white"
+                    >
+                      {isBotRunning ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                  <p className="mt-4 text-sm text-gray-400">
                     {isBotRunning
                       ? "Bot is analyzing the current position..."
                       : "Bot is inactive. Press Start to begin analysis."}
                   </p>
-                </div>
-
-                <Button
-                  onClick={handleLogout}
-                  className="w-full mt-4 bg-[#424242] hover:bg-[#3a3a3a]"
-                >
-                  Log Out
-                </Button>
-              </>
-            )}
-          </>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         )}
       </main>
 
-      <footer className="mt-4 text-center text-xs text-gray-400">
+      <footer className="mt-4 text-center text-xs text-gray-500">
         ChessMaster v{version}
       </footer>
     </div>

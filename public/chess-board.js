@@ -357,7 +357,7 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
   if (request.action === "startChessCom") {
     console.log("[CHESS.COM]: Start command recieved");
     await chessCom.Start();
-    await chessCom.saveOnCheckMate();
+    //await chessCom.saveOnCheckMate();
   }
 });
 

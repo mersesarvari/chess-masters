@@ -368,7 +368,7 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
   if (request.action === "startLychessOrg") {
     console.log("[LYCHESS]: Start command recieved");
     await lychessOrg.Start();
-    await lychessOrg.stopOnCheckmate();
+    await lychessOrg.saveOnCheckMate();
   }
 });
 

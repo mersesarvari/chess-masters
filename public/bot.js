@@ -64,6 +64,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+//TODO: Checking if the previous uirl changed from lychess to chess.com or versa
 // Getting the current URL
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   try {

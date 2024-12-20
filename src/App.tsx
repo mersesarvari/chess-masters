@@ -109,14 +109,10 @@ export default function App() {
           </div>
         </div>
         {isLoggedIn && (
-          <Button
-            variant="ghost"
-            size="icon"
+          <LogOutIcon
+            className="text-red-700 cursor-pointer"
             onClick={handleLogout}
-            className="text-gray-400 hover:text-white"
-          >
-            <LogOutIcon className="w-5 h-5" />
-          </Button>
+          />
         )}
       </header>
 

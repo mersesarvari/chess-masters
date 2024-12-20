@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function App() {
   const version = "1.0.0";
-  const [versionOk, setVersionOk] = useState(false);
+  const [versionOk, setVersionOk] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isBotRunning, setIsBotRunning] = useState(false);
   const [email, setEmail] = useState("");
@@ -84,10 +84,6 @@ export default function App() {
     chrome.tabs.create({
       url: "https://www.chessmaster.cloud/register",
     });
-  };
-
-  const toggleBot = () => {
-    setIsBotRunning((prev) => !prev);
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -210,7 +206,9 @@ export default function App() {
               <>
                 <div className="flex justify-between items-center mb-4">
                   <Button
-                    onClick={toggleBot}
+                    onClick={() => {
+                      setIsBotRunning((prev) => !prev);
+                    }}
                     id="startButton"
                     className={`flex-1 ${
                       isBotRunning

@@ -3,19 +3,6 @@ const chessCom = {
   isActive: false,
   intervalId: null,
   moves: [],
-  isStopOnCheckmateActive: false,
-
-  boardHasChanged: function () {
-    const moveNodes = chessCom.checkMoves();
-    const currentMoves = moveNodes.map((node) => node.moveText);
-    if (chessCom.moves.length < currentMoves.length) {
-      chessCom.clearArrows();
-      chessCom.moves = currentMoves;
-      return true;
-    } else {
-      return false;
-    }
-  },
 
   showMoves: async function (moves) {
     // Make a POST request to the specified endpoint
@@ -73,6 +60,17 @@ const chessCom = {
 
   Start: async function () {
     chessCom.getColor();
+    function boardHasChanged() {
+      const moveNodes = chessCom.checkMoves();
+      const currentMoves = moveNodes.map((node) => node.moveText);
+      if (chessCom.moves.length < currentMoves.length) {
+        chessCom.clearArrows();
+        chessCom.moves = currentMoves;
+        return true;
+      } else {
+        return false;
+      }
+    }
 
     const myTurn = (moves) => {
       if (chessCom.mycolor === "w" && moves.length % 2 === 0) {
@@ -98,10 +96,7 @@ const chessCom = {
     }
     //Showing moves if a move happened and it is my turn!
     chessCom.intervalId = setInterval(async function () {
-      if (
-        chessCom.boardHasChanged() === true &&
-        myTurn(chessCom.moves) === true
-      ) {
+      if (boardHasChanged() === true && myTurn(chessCom.moves) === true) {
         await chessCom.showMoves(chessCom.moves);
       }
     }, 100);
@@ -119,24 +114,20 @@ const chessCom = {
     console.log("[ChessMaster]: Stopped");
   },
 
-  stopOnCheckmate: async function () {
-    if (chessCom.isStopOnCheckmateActive || !chessCom.isActive) {
+  saveOnCheckMate: async function () {
+    let checkInterval = null;
+    if (!chessCom.isActive) {
+      chessCom.moves = [];
+      chessCom.isActive = false;
       return;
     } else {
-      chessCom.isStopOnCheckmateActive = true;
-      chessCom.isActive = false;
-      const checkInterval = setInterval(async () => {
-        // Get all the text content on the page
+      checkInterval = setInterval(async () => {
         const pageText = document.body.innerText || document.body.textContent;
 
-        // Check if the text contains keywords indicating game over or checkmate
         const isGameOver = pageText?.includes("Game Review");
 
         // Check if game is over and if a winner is found
         if (isGameOver) {
-          //Stopping from re-running
-          chessCom.isActive = false;
-          clearInterval(checkInterval);
           chessCom.clearArrows();
 
           const mewon = pageText?.includes("You Won!");
@@ -195,11 +186,8 @@ const chessCom = {
               }
             } catch (error) {
               console.error("Cannot save the game to the database!", error);
-            } finally {
-              chessCom.Stop();
-              console.log("[BOARD.js]: Stopped on checkmate");
-              chessCom.isStopOnCheckmateActive = false;
             }
+            chessCom.moves = [];
           });
         }
       }, 100); // Check every 1000 milliseconds (1 second)
@@ -369,7 +357,7 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
   if (request.action === "startChessCom") {
     console.log("[CHESS.COM]: Start command recieved");
     await chessCom.Start();
-    await chessCom.stopOnCheckmate();
+    await chessCom.saveOnCheckMate();
   }
 });
 

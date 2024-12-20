@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
-import { PlayIcon, CirclePause, Settings, LogIn } from "lucide-react";
+import { PlayIcon, CirclePause, LogIn } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -13,14 +11,11 @@ export default function App() {
   const [versionOk, setVersionOk] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isBotRunning, setIsBotRunning] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [depth, setDepth] = useState(10);
-  const [autoPlay, setAutoPlay] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  // Retrieve stored email and password from chrome storage
   useEffect(() => {
-    // Retrieve stored email and password from chrome storage
     chrome.storage.local.get(["email", "password", "running"], (result) => {
       if (result.email && result.password) {
         setEmail(result.email);
@@ -82,7 +77,9 @@ export default function App() {
     }
   }, [isBotRunning, isLoggedIn]);
 
-  const handleRegisterClick = (e: any) => {
+  const handleRegisterClick = (
+    e: React.MouseEvent<HTMLAnchorElement, MouseEvent>
+  ) => {
     e.preventDefault(); // Prevent the default link behavior
     chrome.tabs.create({
       url: "https://www.chessmaster.cloud/register",
@@ -129,15 +126,6 @@ export default function App() {
           <ChessIcon className="w-6 h-6 mr-2 text-[#7fa650]" />
           <h1 className="text-xl font-bold">Chess Master Bot</h1>
         </div>
-        {isLoggedIn && (
-          <Button
-            onClick={() => setShowSettings(!showSettings)}
-            disabled
-            aria-label="Settings"
-          >
-            <Settings className="w-5 h-5 text-[#7fa650]" />
-          </Button>
-        )}
       </header>
 
       <main>
@@ -252,37 +240,6 @@ export default function App() {
                       : "Bot is inactive. Press Start to begin analysis."}
                   </p>
                 </div>
-
-                {showSettings && (
-                  <div className="bg-[#1a1a1a] p-3 rounded-md mb-4">
-                    <h2 className="text-sm font-semibold mb-2">Settings</h2>
-                    <div className="flex items-center justify-between mb-2">
-                      <label htmlFor="depth" className="text-sm">
-                        Analysis Depth
-                      </label>
-                      <Slider
-                        id="depth"
-                        min={1}
-                        max={20}
-                        step={1}
-                        value={[depth]}
-                        onValueChange={(value) => setDepth(value[0])}
-                        className="w-32"
-                      />
-                      <span className="text-sm ml-2">{depth}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <label htmlFor="autoPlay" className="text-sm">
-                        Auto Play Best Move
-                      </label>
-                      <Switch
-                        id="autoPlay"
-                        checked={autoPlay}
-                        onCheckedChange={setAutoPlay}
-                      />
-                    </div>
-                  </div>
-                )}
 
                 <Button
                   onClick={handleLogout}

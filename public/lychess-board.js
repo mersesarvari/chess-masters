@@ -3,7 +3,6 @@ const lychessOrg = {
   isActive: false,
   intervalId: null,
   moves: [],
-  isStopOnCheckmateActive: false,
 
   Start: async function () {
     lychessOrg.getColor();
@@ -116,13 +115,14 @@ const lychessOrg = {
     console.log("[ChessMaster]: Stopped");
   },
 
-  stopOnCheckmate: async function () {
-    if (lychessOrg.isStopOnCheckmateActive || !lychessOrg.isActive) {
+  saveOnCheckMate: async function () {
+    let checkInterval = null;
+    if (!lychessOrg.isActive) {
+      lychessOrg.moves = [];
+      clearInterval(checkInterval);
       return;
     } else {
-      lychessOrg.isStopOnCheckmateActive = true;
-      lychessOrg.isActive = false;
-      const checkInterval = setInterval(async () => {
+      checkInterval = setInterval(async () => {
         const pageText = document.body.innerText || document.body.textContent;
 
         //Options when the game ended
@@ -137,9 +137,6 @@ const lychessOrg = {
 
         // Check if game is over and if a winner is found
         if (isGameOver) {
-          //Stopping from re-running
-          lychessOrg.isActive = false;
-          clearInterval(checkInterval);
           lychessOrg.clearArrows();
 
           let winColor = "-";
@@ -191,14 +188,11 @@ const lychessOrg = {
               }
             } catch (error) {
               console.error("Cannot save the game to the database!", error);
-            } finally {
-              lychessOrg.Stop();
-              console.log("[BOARD.js]: Stopped on checkmate");
-              lychessOrg.isStopOnCheckmateActive = false;
             }
+            lychessOrg.moves = [];
           });
         }
-      }, 100); // Check every 1000 milliseconds (1 second)
+      }, 200); // Check every 1000 milliseconds (1 second)
     }
   },
 

@@ -18,10 +18,11 @@ import {
   LogInIcon,
   LogOutIcon,
   AlertTriangleIcon,
+  Coffee,
 } from "lucide-react";
 
 export default function App() {
-  const version = "1.0.1";
+  const version = "1.0.2";
   const [versionOk, setVersionOk] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isBotRunning, setIsBotRunning] = useState(false);
@@ -277,8 +278,17 @@ export default function App() {
         )}
       </main>
 
-      <footer className="mt-4 text-center text-xs text-gray-500">
-        ChessMaster v{version}
+      <footer className="mt-4 text-center">
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full bg-[#13C3FF] text-white hover:bg-[#11A8E3] py-4 text-ms"
+          onClick={() => window.open("https://ko-fi.com/nazmox", "_blank")}
+        >
+          <Coffee className="w-4 h-4 mr-2" />
+          Support us on Ko-fi
+        </Button>
+        <p className="mt-2 text-xs text-gray-500">ChessMaster v{version}</p>
       </footer>
     </div>
   );

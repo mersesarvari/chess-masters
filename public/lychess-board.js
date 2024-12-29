@@ -362,11 +362,113 @@ const lychessOrg = {
       svg.removeChild(arrow); // Remove each arrow from the SVG container
     });
   },
+
+  createSupportPopup: function () {
+    // Create modal elements
+    const modal = document.createElement("div");
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    `;
+
+    const modalContent = document.createElement("div");
+    modalContent.style.cssText = `
+        width: 400px;
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+        color: white;
+        font-family: Arial, sans-serif;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    `;
+
+    // Add content
+    modalContent.innerHTML = `
+        <h1 style="margin-bottom: 20px; font-size: 24px;">Support Chess Bot</h1>
+        <div style="margin-bottom: 30px; line-height: 1.5;">
+            Thank you for using my chess bot extension! If you're enjoying the enhanced gameplay experience, 
+            please consider supporting this project to help keep it growing! ♟️
+        </div>
+        <div>
+            <button id="supportBtn" style="
+                padding: 10px 20px;
+                background: #ffd700;
+                color: #333;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+                font-weight: bold;
+                margin: 5px;
+                transition: background 0.3s;
+            ">Support Project ❤️</button>
+            
+            <button id="closeBtn" style="
+                padding: 10px 20px;
+                background: rgba(255, 255, 255, 0.2);
+                color: white;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+                font-weight: bold;
+                margin: 5px;
+                transition: background 0.3s;
+            ">Close</button>
+        </div>
+    `;
+
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    // Add hover effects
+    const supportBtn = modalContent.querySelector("#supportBtn");
+    const closeBtn = modalContent.querySelector("#closeBtn");
+
+    supportBtn.onmouseover = () => (supportBtn.style.background = "#ffed4a");
+    supportBtn.onmouseout = () => (supportBtn.style.background = "#ffd700");
+    closeBtn.onmouseover = () =>
+      (closeBtn.style.background = "rgba(255, 255, 255, 0.3)");
+    closeBtn.onmouseout = () =>
+      (closeBtn.style.background = "rgba(255, 255, 255, 0.2)");
+
+    // Add click handlers
+    supportBtn.onclick = () => {
+      window.open("https://ko-fi.com/nazmox", "_blank");
+      modal.remove();
+    };
+
+    closeBtn.onclick = () => {
+      modal.remove();
+    };
+
+    // Close on overlay click
+    modal.onclick = (e) => {
+      if (e.target === modal) {
+        modal.remove();
+      }
+    };
+
+    // Close on escape key
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") {
+        modal.remove();
+      }
+    });
+  },
 };
 
 chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
   if (request.action === "startLychessOrg") {
     console.log("[LYCHESS]: Start command recieved");
+    lychessOrg.createSupportPopup();
     await lychessOrg.Start();
     //await lychessOrg.saveOnCheckMate();
   }

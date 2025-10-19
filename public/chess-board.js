@@ -1,36 +1,3 @@
-// Show loading spinner
-function showLoading() {
-  let spinner = document.createElement("div");
-  spinner.id = "chess-loading-spinner";
-  spinner.style.position = "fixed";
-  spinner.style.top = "50%";
-  spinner.style.left = "50%";
-  spinner.style.transform = "translate(-50%, -50%)";
-  spinner.style.width = "50px";
-  spinner.style.height = "50px";
-  spinner.style.border = "6px solid #ccc";
-  spinner.style.borderTop = "6px solid rgb(150, 190, 70)";
-  spinner.style.borderRadius = "50%";
-  spinner.style.animation = "spin 1s linear infinite";
-  spinner.style.zIndex = "9999";
-  document.body.appendChild(spinner);
-}
-
-// Remove spinner
-function hideLoading() {
-  const spinner = document.getElementById("chess-loading-spinner");
-  if (spinner) spinner.remove();
-}
-
-// Add CSS for spin animation
-const style = document.createElement("style");
-style.innerHTML = `
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}`;
-document.head.appendChild(style);
-
 const chessCom = {
   mycolor: "w",
   isActive: false,
@@ -38,7 +5,6 @@ const chessCom = {
   moves: [],
 
   showMoves: async function (moves) {
-    showLoading();
     // Make a POST request to the specified endpoint
     async function fetchFen() {
       try {
@@ -85,7 +51,6 @@ const chessCom = {
               const from = firstMove.substring(0, 2);
               const to = firstMove.substring(2, 4);
               console.log("Best move recieved: ", from, to);
-              hideLoading();
               chessCom.drawArrow(from, to);
             }
           }

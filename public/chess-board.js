@@ -34,6 +34,7 @@ const chessCom = {
     const { fen } = await fetchFen();
 
     try {
+      console.log("Asking for best move from the server...");
       chrome.runtime.sendMessage(
         { action: "getMove", fen: fen },
         (response) => {
@@ -49,6 +50,7 @@ const chessCom = {
             if (firstMove.length === 4) {
               const from = firstMove.substring(0, 2);
               const to = firstMove.substring(2, 4);
+              console.log("Best move recieved: ", from, to);
               chessCom.drawArrow(from, to);
             }
           }
@@ -208,35 +210,40 @@ const chessCom = {
   },
 
   checkMoves: function () {
-    // Select all div elements with class 'node'
-    const moves = document.querySelectorAll(".node");
+    try {
+      // Select all div elements with class 'node'
+      const moves = document.querySelectorAll(".node");
 
-    // Create an array to store the extracted moves
-    const extractedMoves = [];
+      // Create an array to store the extracted moves
+      const extractedMoves = [];
 
-    // Loop through the selected div elements
-    moves.forEach((move) => {
-      let moveText = "";
-      // Extract the data-node attribute and the move text inside the span
-      const dataNode = move.getAttribute("data-node");
-      //Checkin if the span has a span with the moving piece icon:
-      const pieceIcon = move?.querySelector("span[data-figurine]");
-      //If it has an icon, extract the text
-      if (pieceIcon === null) {
-        moveText = move?.querySelector("span")?.textContent?.trim();
-      } else {
-        const iconValue = pieceIcon.getAttribute("data-figurine");
-        moveText = `${iconValue}${move
-          ?.querySelector("span")
-          ?.textContent?.trim()}`;
-      }
+      // Loop through the selected div elements
+      moves.forEach((move) => {
+        let moveText = "";
+        // Extract the data-node attribute and the move text inside the span
+        const dataNode = move.getAttribute("data-node");
+        //Checkin if the span has a span with the moving piece icon:
+        const pieceIcon = move?.querySelector("span[data-figurine]");
+        //If it has an icon, extract the text
+        if (pieceIcon === null) {
+          moveText = move?.querySelector("span")?.textContent?.trim();
+        } else {
+          const iconValue = pieceIcon.getAttribute("data-figurine");
+          moveText = `${iconValue}${move
+            ?.querySelector("span")
+            ?.textContent?.trim()}`;
+        }
 
-      // If move text is available, store the result
-      if (moveText) {
-        extractedMoves.push({ dataNode, moveText });
-      }
-    });
-    return extractedMoves;
+        // If move text is available, store the result
+        if (moveText) {
+          extractedMoves.push({ dataNode, moveText });
+        }
+      });
+      return extractedMoves;
+    } catch (error) {
+      console.error("checkMoves failed:", error);
+      return [];
+    }
   },
 
   getColor: function () {

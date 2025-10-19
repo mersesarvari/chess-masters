@@ -1,7 +1,10 @@
 let oldUrl = "";
 let url = "";
 
-// Checking if the chrome.storage.local "active" object is true
+// -----------------------------
+// Helper functions
+// -----------------------------
+
 function checkIfBotActive() {
   chrome.storage.local.get(["active"], (result) => {
     if (chrome.runtime.lastError) {
@@ -15,82 +18,19 @@ function checkIfBotActive() {
   });
 }
 
-checkIfBotActive();
-
-// Listen for changes in chrome.storage.local
-chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === "local" && changes.active) {
-    const newValue = changes.active.newValue;
-    console.log(`Active changed to: ${newValue}`);
-    if (newValue === "true") {
-      StartCommand(); // Automatically send the start command when active is true
-    }
-  }
-});
-
-// Start listener
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "start") {
-    // Setting "active" in chrome.storage.local to true
-    chrome.storage.local.set({ active: "true" }, () => {
-      if (chrome.runtime.lastError) {
-        console.error("Error setting data:", chrome.runtime.lastError);
-        return;
-      }
-      console.log("[BOT]: active=true");
-    });
-
-    StartCommand();
-  }
-  if (request.action === "stop") {
-    chrome.storage.local.set({ active: "false" }, () => {
-      if (chrome.runtime.lastError) {
-        console.error("Error setting data:", chrome.runtime.lastError);
-        return;
-      }
-      console.log("[BOT]: active=false");
-    });
-    console.log("[BACKGROUND]: Stop command received");
-    chrome.tabs?.query({ active: true, currentWindow: true }, function (tabs) {
-      chrome.tabs?.sendMessage(tabs[0].id, {
-        action: "stop",
-      });
-    });
-    return true;
-  }
-  if (request.action === "login") {
-    login(request.email, request.password, sendResponse);
-    return true;
-  }
-});
-
-//TODO: Checking if the previous uirl changed from lychess to chess.com or versa
-// Getting the current URL
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  try {
-    console.log("[BOT]: Updated tab URL: ", tab.url);
-    // Check if tab and tab.url exist before using includes
-    if (changeInfo.status === "complete" && tab && tab.url) {
-      url = tab.url;
-      if (oldUrl !== url) {
-        oldUrl = url;
-        //Checking if the bot has to start
-        checkIfBotActive();
-      }
-    }
-  } catch (error) {
-    console.error("[BACKGROUND] Unexpected error:", error);
-  }
-});
-
 function getStartCommand() {
+  if (!url) {
+    console.log("No URL found, stopping");
+    return "stop";
+  }
   if (url.includes("lichess.org")) {
     console.log("You are playing on Lichess.org");
-    return "startLychessOrg";
+    return "startLichessOrg";
   } else if (url.includes("chess.com")) {
     console.log("You are playing on Chess.com");
     return "startChessCom";
   } else {
+    console.log("Else, stopping");
     return "stop";
   }
 }
@@ -101,13 +41,8 @@ async function login(email, password, sendResponse) {
       "https://chess-master-webpage.vercel.app/api/login",
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: email,
-          password: password,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       }
     );
     if (response.ok) {
@@ -124,66 +59,124 @@ async function login(email, password, sendResponse) {
   }
 }
 
-async function Stop() {
-  chrome.tabs?.query({ active: true, currentWindow: true }, function (tabs) {
-    chrome.tabs?.sendMessage(tabs[0].id, {
-      action: "stop",
-    });
+function Stop() {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (!tabs[0]) return;
+    chrome.tabs.sendMessage(tabs[0].id, { action: "stop" });
   });
 }
 
-async function StartCommand() {
+function StartCommand() {
+  if (!url) {
+    console.log(
+      "[BACKGROUND]: No active tab URL yet, will wait for tab update."
+    );
+    return;
+  }
+
   Stop();
-  console.log("[BACKGROUND]: Start command received");
-  console.log("[BACKGROUND]: ", url);
-  chrome.tabs?.query({ active: true, currentWindow: true }, function (tabs) {
-    chrome.tabs?.sendMessage(tabs[0].id, {
-      action: getStartCommand(),
-    });
+  console.log("[BACKGROUND]: Start command received", url);
+
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (!tabs[0]) return;
+    chrome.tabs.sendMessage(tabs[0].id, { action: getStartCommand() });
   });
-  return true;
 }
+
+// -----------------------------
+// Initialization
+// -----------------------------
+
+checkIfBotActive();
+
+// Listen for storage changes
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === "local" && changes.active) {
+    const newValue = changes.active.newValue;
+    console.log(`Active changed to: ${newValue}`);
+    if (newValue === "true") {
+      StartCommand();
+    }
+  }
+});
+
+// Listen for tab updates
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  try {
+    if (changeInfo.status === "complete" && tab && tab.url) {
+      url = tab.url;
+      if (oldUrl !== url) {
+        oldUrl = url;
+        checkIfBotActive();
+      }
+    }
+  } catch (error) {
+    console.error("[BACKGROUND] Unexpected error:", error);
+  }
+});
+
+// -----------------------------
+// Message listener
+// -----------------------------
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "getMove") {
-    console.log("request.fen: ", request.fen);
-
-    // Build URL with query parameters
-    const url = `https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(
-      request.fen
-    )}&depth=4`;
-
-    fetch(url, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        console.log("Stockfish API response: ", data);
-        if (data.success) {
-          // Extract the actual move from "bestmove e2e4 ponder e7e6"
-          const bestMove = data.bestmove.split(" ")[1];
-          sendResponse({
-            success: true,
-            bestmove: bestMove,
-            evaluation: data.evaluation,
-            mate: data.mate,
-            continuation: data.continuation,
-          });
-        } else {
-          sendResponse({
-            success: false,
-            error: "Stockfish API returned failure",
-          });
-        }
-      })
-      .catch((error) => {
-        console.error("Error in background script fetch:", error);
-        sendResponse({ success: false, error: error.message });
+  switch (request.action) {
+    case "start":
+      chrome.storage.local.set({ active: "true" }, () => {
+        if (chrome.runtime.lastError) console.error(chrome.runtime.lastError);
+        else console.log("[BOT]: active=true");
       });
+      StartCommand();
+      break;
 
-    return true; // Keep the message channel open for async response
+    case "stop":
+      chrome.storage.local.set({ active: "false" }, () => {
+        if (chrome.runtime.lastError) console.error(chrome.runtime.lastError);
+        else console.log("[BOT]: active=false");
+      });
+      Stop();
+      break;
+
+    case "login":
+      login(request.email, request.password, sendResponse);
+      return true; // Keep async channel open
+
+    case "getMove":
+      if (!request.fen) {
+        sendResponse({ success: false, error: "FEN not provided" });
+        return;
+      }
+
+      const stockfishUrl = `https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(
+        request.fen
+      )}&depth=12`;
+
+      fetch(stockfishUrl)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) {
+            const bestMove = data.bestmove.split(" ")[1];
+            sendResponse({
+              success: true,
+              bestmove: bestMove,
+              evaluation: data.evaluation,
+              mate: data.mate,
+              continuation: data.continuation,
+            });
+          } else {
+            sendResponse({
+              success: false,
+              error: "Stockfish API returned failure",
+            });
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching Stockfish API:", error);
+          sendResponse({ success: false, error: error.message });
+        });
+      return true; // Keep async channel open
+
+    default:
+      console.warn("Unknown action:", request.action);
   }
 });

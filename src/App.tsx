@@ -44,7 +44,7 @@ export default function App() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const url = "https://chess-master-webpage.vercel.app//api/version";
+      const url = "https://chess-master-webpage.vercel.app/api/version";
       const requestData = { version: version };
       try {
         const response = await fetch(url, {

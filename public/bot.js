@@ -98,7 +98,7 @@ function getStartCommand() {
 async function login(email, password, sendResponse) {
   try {
     const response = await fetch(
-      "https://chess-master-webpage.vercel.app//api/login",
+      "https://chess-master-webpage.vercel.app/api/login",
       {
         method: "POST",
         headers: {
@@ -143,3 +143,47 @@ async function StartCommand() {
   });
   return true;
 }
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "getMove") {
+    console.log("request.fen: ", request.fen);
+
+    // Build URL with query parameters
+    const url = `https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(
+      request.fen
+    )}&depth=4`;
+
+    fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        console.log("Stockfish API response: ", data);
+        if (data.success) {
+          // Extract the actual move from "bestmove e2e4 ponder e7e6"
+          const bestMove = data.bestmove.split(" ")[1];
+          sendResponse({
+            success: true,
+            bestmove: bestMove,
+            evaluation: data.evaluation,
+            mate: data.mate,
+            continuation: data.continuation,
+          });
+        } else {
+          sendResponse({
+            success: false,
+            error: "Stockfish API returned failure",
+          });
+        }
+      })
+      .catch((error) => {
+        console.error("Error in background script fetch:", error);
+        sendResponse({ success: false, error: error.message });
+      });
+
+    return true; // Keep the message channel open for async response
+  }
+});

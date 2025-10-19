@@ -290,7 +290,7 @@ export default function App() {
           <Coffee className="w-4 h-4 mr-2" />
           Support us on Ko-fi
         </Button>
-        <p className="mt-2 text-xs text-gray-500">ChessMaster v{version}</p>
+        <p className="mt-2 text-xs text-gray-500">ChessSolve v{version}</p>
       </footer>
     </div>
   );

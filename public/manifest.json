@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Chess Analysis Bot",
+  "name": "ChessSolve Bot",
   "version": "1.0",
   "description": "A chess analysis bot for browser-based chess games",
   "permissions": ["activeTab", "scripting", "storage"],

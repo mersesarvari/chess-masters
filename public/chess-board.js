@@ -91,7 +91,7 @@ const chessCom = {
     }
     chessCom.isActive = true;
 
-    console.log("[ChessMaster]: Started");
+    console.log("[ChessSolve]: Started");
     //Showing move if no move happened and it is my turn (Im white)
     if (myTurn(chessCom.moves) === true) {
       console.log("Show moves because this is my turn!");
@@ -114,7 +114,7 @@ const chessCom = {
     chessCom.moves = [];
     chessCom.isActive = false;
     chessCom.clearArrows();
-    console.log("[ChessMaster]: Stopped");
+    console.log("[ChessSolve]: Stopped");
   },
 
   saveOnCheckMate: async function () {

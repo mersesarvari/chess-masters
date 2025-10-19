@@ -67,17 +67,21 @@ function StartCommand() {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (!tabs[0] || !tabs[0].url) {
       console.log("[BACKGROUND]: No active tab URL yet, will retry in 200ms");
-      setTimeout(StartCommand, 200); // Retry after 200ms
+      setTimeout(StartCommand, 200);
       return;
     }
 
     url = tabs[0].url;
     if (oldUrl !== url) oldUrl = url;
 
+    console.log("[BACKGROUND]: Preparing to start", url);
     Stop();
-    console.log("[BACKGROUND]: Start command received", url);
 
-    chrome.tabs.sendMessage(tabs[0].id, { action: getStartCommand() });
+    // Wait 300ms before starting (adjust if needed)
+    setTimeout(() => {
+      console.log("[BACKGROUND]: Start command sent", url);
+      chrome.tabs.sendMessage(tabs[0].id, { action: getStartCommand() });
+    }, 300);
   });
 }
 

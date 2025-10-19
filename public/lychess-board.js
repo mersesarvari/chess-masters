@@ -32,7 +32,7 @@ const lychessOrg = {
       async function fetchFen() {
         try {
           const response = await fetch(
-            "https://www.chessmaster.cloud/api/chess",
+            "https://chess-master-webpage.vercel.app//api/chess",
             {
               // Replace with your actual endpoint
               method: "POST",
@@ -171,7 +171,7 @@ const lychessOrg = {
             // Saving the game to the database
             try {
               const response = await fetch(
-                "https://www.chessmaster.cloud/api/game",
+                "https://chess-master-webpage.vercel.app//api/game",
                 {
                   method: "POST",
                   headers: {

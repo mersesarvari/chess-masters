@@ -44,7 +44,7 @@ export default function App() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const url = "https://www.chessmaster.cloud/api/version";
+      const url = "https://chess-master-webpage.vercel.app//api/version";
       const requestData = { version: version };
       try {
         const response = await fetch(url, {
@@ -75,7 +75,9 @@ export default function App() {
     e: React.MouseEvent<HTMLAnchorElement, MouseEvent>
   ) => {
     e.preventDefault();
-    chrome.tabs.create({ url: "https://www.chessmaster.cloud/register" });
+    chrome.tabs.create({
+      url: "https://chess-master-webpage.vercel.app//register",
+    });
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -134,7 +136,7 @@ export default function App() {
               <Button
                 onClick={() =>
                   window.open(
-                    "https://www.chessmaster.cloud/#download",
+                    "https://chess-master-webpage.vercel.app//#download",
                     "_blank"
                   )
                 }

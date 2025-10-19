@@ -1,4 +1,4 @@
-# [ChessMaster](https://www.chessmaster.cloud/) Chess.com Bot
+# [ChessMaster](https://chess-master-webpage.vercel.app//) Chess.com Bot
 
 ## Overview
 
@@ -17,8 +17,8 @@ The Chess Masters Chess.com Bot is a real-time chess game analyzer designed to r
 
 Before you begin, ensure that you have met the following requirements:
 
-- Create a chess-masters account on https://www.chessmaster.cloud/
-- Install the extension on your browser: https://www.chessmaster.cloud/setup-guide
+- Create a chess-masters account on https://chess-master-webpage.vercel.app//
+- Install the extension on your browser: https://chess-master-webpage.vercel.app//setup-guide
 
 ## Installation & Setup
 
@@ -42,7 +42,7 @@ cd chess-masters
    The suggestions will be updated in real-time as the game progresses.
 4. Move History:
    The bot keeps track of all moves and displays a move history for easy reference.
-   You can check your replayes on https://www.chessmaster.cloud/
+   You can check your replayes on https://chess-master-webpage.vercel.app//
 
 ## Support the Developer
 

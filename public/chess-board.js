@@ -8,17 +8,14 @@ const chessCom = {
     // Make a POST request to the specified endpoint
     async function fetchFen() {
       try {
-        const response = await fetch(
-          "https://chess-master-webpage.vercel.app/api/chess",
-          {
-            // Replace with your actual endpoint
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json", // Specify content type as JSON
-            },
-            body: JSON.stringify({ moves }), // Send moves as JSON body
-          }
-        );
+        const response = await fetch("https://www.chesssolve.com/api/chess", {
+          // Replace with your actual endpoint
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json", // Specify content type as JSON
+          },
+          body: JSON.stringify({ moves }), // Send moves as JSON body
+        });
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response}`);
@@ -172,7 +169,7 @@ const chessCom = {
             // Saving the game to the database
             try {
               const response = await fetch(
-                "https://chess-master-webpage.vercel.app/api/game",
+                "https://www.chesssolve.com/api/game",
                 {
                   method: "POST",
                   headers: {

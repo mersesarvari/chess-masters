@@ -44,7 +44,7 @@ export default function App() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const url = "https://chess-master-webpage.vercel.app/api/version";
+      const url = "https://www.chesssolve.com/api/version";
       const requestData = { version: version };
       try {
         const response = await fetch(url, {
@@ -76,7 +76,7 @@ export default function App() {
   ) => {
     e.preventDefault();
     chrome.tabs.create({
-      url: "https://chess-master-webpage.vercel.app//register",
+      url: "https://www.chesssolve.com/register",
     });
   };
 
@@ -135,10 +135,7 @@ export default function App() {
               </p>
               <Button
                 onClick={() =>
-                  window.open(
-                    "https://chess-master-webpage.vercel.app//#download",
-                    "_blank"
-                  )
+                  window.open("https://www.chesssolve.com//#download", "_blank")
                 }
                 className="w-full bg-red-600 hover:bg-red-700 text-white"
               >

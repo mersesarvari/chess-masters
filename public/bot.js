@@ -37,14 +37,11 @@ function getStartCommand() {
 
 async function login(email, password, sendResponse) {
   try {
-    const response = await fetch(
-      "https://chess-master-webpage.vercel.app/api/login",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      }
-    );
+    const response = await fetch("https://www.chesssolve.com/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
     if (response.ok) {
       await chrome.storage.local.set({ email, password });
       console.log("Login successful");

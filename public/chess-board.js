@@ -109,9 +109,10 @@ const chessCom = {
     }
 
     chessCom.moves = [];
-    chessCom.isActive = false;
+    chessCom.isActive = false; // ✅ ensure reset
     chessCom.clearArrows();
     console.log("[ChessSolve]: Stopped");
+    chrome.runtime.sendMessage({ action: "stoppedAck" });
   },
 
   saveOnCheckMate: async function () {

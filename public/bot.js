@@ -57,16 +57,36 @@ async function login(email, password, sendResponse) {
 }
 
 function Stop() {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (!tabs[0]) return;
-    chrome.tabs.sendMessage(tabs[0].id, { action: "stop" });
+  return new Promise((resolve) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs[0]) return resolve(false);
+
+      const tabId = tabs[0].id;
+
+      const listener = (message, sender) => {
+        if (
+          sender.tab &&
+          sender.tab.id === tabId &&
+          message.action === "stoppedAck"
+        ) {
+          chrome.runtime.onMessage.removeListener(listener);
+          resolve(true);
+        }
+      };
+
+      chrome.runtime.onMessage.addListener(listener);
+      chrome.tabs.sendMessage(tabId, { action: "stop" });
+
+      // Fallback timeout if no ack within 500 ms
+      setTimeout(() => resolve(false), 500);
+    });
   });
 }
 
-function StartCommand() {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+async function StartCommand() {
+  chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
     if (!tabs[0] || !tabs[0].url) {
-      console.log("[BACKGROUND]: No active tab URL yet, will retry in 200ms");
+      console.log("[BACKGROUND]: No active tab URL yet, retrying...");
       setTimeout(StartCommand, 200);
       return;
     }
@@ -75,13 +95,10 @@ function StartCommand() {
     if (oldUrl !== url) oldUrl = url;
 
     console.log("[BACKGROUND]: Preparing to start", url);
-    Stop();
+    await Stop(); // ✅ Wait until stop acknowledged
 
-    // Wait 300ms before starting (adjust if needed)
-    setTimeout(() => {
-      console.log("[BACKGROUND]: Start command sent", url);
-      chrome.tabs.sendMessage(tabs[0].id, { action: getStartCommand() });
-    }, 300);
+    console.log("[BACKGROUND]: Start command sent", url);
+    chrome.tabs.sendMessage(tabs[0].id, { action: getStartCommand() });
   });
 }
 

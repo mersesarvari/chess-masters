@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Chess Masters Chess.com Bot is a real-time chess game analyzer designed to read the chess board during both Bot vs Player and Player vs Player games on Chess.com. It suggests the best moves for the player based on the current game state using advanced chess engines and AI. This bot aims to assist players in making optimal moves by providing real-time analysis and move recommendations.
+The ChessSolve Chess.com Bot is a real-time chess game analyzer designed to read the chess board during both Bot vs Player and Player vs Player games on Chess.com. It suggests the best moves for the player based on the current game state using advanced chess engines and AI. This bot aims to assist players in making optimal moves by providing real-time analysis and move recommendations.
 
 ## Features
 
@@ -32,7 +32,7 @@ cd chess-masters
 ## Usage
 
 1. Start a Game:
-   Bot vs Player: Start a game against the Chess Masters Bot on Chess.com. The bot will automatically read the chessboard and suggest moves. You have to start hte bot after every game for safety reasons.
+   Bot vs Player: Start a game against the ChessSolve Bot on Chess.com. The bot will automatically read the chessboard and suggest moves. You have to start hte bot after every game for safety reasons.
    Player vs Player: During a game, the bot can read the board and suggest the best moves for both players.
 2. Game Board Display:
    The bot will provide a visual representation of the current chess board.

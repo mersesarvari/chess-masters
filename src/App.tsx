@@ -107,7 +107,7 @@ export default function App() {
         <div className="flex items-center space-x-2">
           <ChessIcon className="w-6 h-6 text-[#7fa650]" />
           <div>
-            <h1 className="text-xl font-bold">Chess Master Bot</h1>
+            <h1 className="text-xl font-bold">ChessSolve Bot</h1>
             <p className="text-xs text-gray-400">v{version}</p>
           </div>
         </div>
@@ -130,8 +130,8 @@ export default function App() {
             </CardHeader>
             <CardContent>
               <p className="text-gray-300 mb-4">
-                Your Chess Master Bot is outdated. Please update to continue
-                using the extension.
+                Your ChessSolve Bot is outdated. Please update to continue using
+                the extension.
               </p>
               <Button
                 onClick={() =>
@@ -151,7 +151,7 @@ export default function App() {
             <CardHeader>
               <CardTitle className="text-[#7fa650]">Welcome Back</CardTitle>
               <CardDescription className="text-gray-400">
-                Login to access Chess Master Bot
+                Login to access ChessSolve Bot
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -221,7 +221,7 @@ export default function App() {
                 <CardHeader>
                   <CardTitle className="text-[#7fa650]">Bot Control</CardTitle>
                   <CardDescription className="text-gray-400">
-                    Manage your Chess Master Bot
+                    Manage your ChessSolve Bot
                   </CardDescription>
                 </CardHeader>
                 <CardContent>

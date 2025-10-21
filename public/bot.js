@@ -186,6 +186,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
 
         try {
+          // 1️⃣ Call backend API
           const res = await fetch("https://www.chesssolve.com/api/best", {
             method: "POST",
             headers: {
@@ -195,15 +196,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             body: JSON.stringify({ moves: request.moves }),
           });
 
+          // 2️⃣ Check HTTP error
           if (!res.ok) {
-            // HTTP error
-            sendResponse({
-              success: false,
-              error: `ChessSolve API returned status ${res.status}`,
-            });
+            // Backend might return 429 if daily limit exceeded
+            if (res.status === 429) {
+              sendResponse({
+                success: false,
+                error: "Daily limit reached (20 requests/day)",
+              });
+            } else {
+              sendResponse({
+                success: false,
+                error: `ChessSolve API returned status ${res.status}`,
+              });
+            }
             return;
           }
 
+          // 3️⃣ Parse response
           const data = await res.json();
 
           if (data.bestmove) {
@@ -214,6 +224,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               from: data.from,
               to: data.to,
               evaluation: data.evaluation,
+              dailyRequests: data.dailyRequests, // optional: show remaining count
+              premium: data.premium, // optional: show premium status
             });
           } else {
             sendResponse({

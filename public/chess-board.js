@@ -10,11 +10,11 @@ const chessCom = {
   showMoves: async function (moves) {
     try {
       console.log("Asking for best move from the server...");
-      console.log("Moves:", moves);
       chrome.runtime.sendMessage(
         { action: "getMove", moves: moves },
         (response) => {
           console.log("Response:", response);
+
           if (chrome.runtime.lastError) {
             console.error("Message failed:", chrome.runtime.lastError.message);
             return;
@@ -22,6 +22,9 @@ const chessCom = {
 
           if (response && response.success && response.from && response.to) {
             chessCom.drawArrow(response.from, response.to);
+          } else if (response && response.error?.includes("Daily limit")) {
+            // Show rate limit popup
+            chessCom.showRateLimitPopup();
           }
         }
       );
@@ -344,3 +347,72 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
       break;
   }
 });
+
+// --------------------
+// Popup function
+// --------------------
+chessCom.showRateLimitPopup = function () {
+  // Avoid creating multiple popups
+  if (document.querySelector("#chess-limit-popup")) return;
+
+  // Create overlay
+  const overlay = document.createElement("div");
+  overlay.id = "chess-limit-popup-overlay";
+  overlay.style.position = "fixed";
+  overlay.style.top = 0;
+  overlay.style.left = 0;
+  overlay.style.width = "100vw";
+  overlay.style.height = "100vh";
+  overlay.style.background = "rgba(0,0,0,0.4)";
+  overlay.style.zIndex = 9999;
+  overlay.style.display = "flex";
+  overlay.style.justifyContent = "center";
+  overlay.style.alignItems = "center";
+
+  // Create popup
+  const popup = document.createElement("div");
+  popup.id = "chess-limit-popup";
+  popup.style.background = "#fff";
+  popup.style.padding = "20px";
+  popup.style.borderRadius = "10px";
+  popup.style.boxShadow = "0 4px 15px rgba(0,0,0,0.3)";
+  popup.style.maxWidth = "400px";
+  popup.style.textAlign = "center";
+  popup.style.fontFamily = "Arial, sans-serif";
+
+  popup.innerHTML = `
+    <h2 style="margin-bottom:10px; color:#333;">Daily Limit Reached</h2>
+    <p style="margin-bottom:15px; color:#555;">
+      You have reached your 20 requests/day limit. 
+      To continue using the bot, please support us on Ko-fi.
+    </p>
+    <a href="https://ko-fi.com/nazmox" target="_blank" style="
+        display:inline-block;
+        padding:10px 20px;
+        background:#ff5c5c;
+        color:#fff;
+        border-radius:5px;
+        text-decoration:none;
+        margin-bottom:10px;
+    ">Become a Supporter</a>
+    <br/>
+    <button id="chess-limit-popup-close" style="
+        padding:6px 12px;
+        border:none;
+        background:#ccc;
+        border-radius:5px;
+        cursor:pointer;
+        margin-top:10px;
+    ">Close</button>
+  `;
+
+  overlay.appendChild(popup);
+  document.body.appendChild(overlay);
+
+  // Close button
+  document
+    .getElementById("chess-limit-popup-close")
+    .addEventListener("click", () => {
+      document.body.removeChild(overlay);
+    });
+};

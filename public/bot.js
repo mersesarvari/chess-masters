@@ -42,13 +42,16 @@ async function login(email, password, sendResponse) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-    if (response.ok) {
-      await chrome.storage.local.set({ email, password });
+    const data = await response.json();
+
+    if (response.ok && data.token) {
+      // Store email + token instead of password
+      await chrome.storage.local.set({ email, token: data.token });
       console.log("Login successful");
       sendResponse({ status: "Login successful", success: true });
     } else {
-      console.error("Login failed:", response);
-      sendResponse({ status: "Login failed", success: false });
+      console.error("Login failed:", data.message);
+      sendResponse({ status: `Login failed: ${data.message}`, success: false });
     }
   } catch (error) {
     console.error("Login error:", error);
@@ -166,23 +169,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return;
       }
 
-      fetch("https://www.chesssolve.com/api/best", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ moves: request.moves }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
+      // Retrieve stored token from extension storage
+      chrome.storage.local.get(["token"], async (result) => {
+        const token = result.token;
+        if (!token) {
+          sendResponse({ success: false, error: "Not authenticated" });
+          return;
+        }
+
+        try {
+          const res = await fetch("https://www.chesssolve.com/api/best", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`, // <-- use the token here
+            },
+            body: JSON.stringify({ moves: request.moves }),
+          });
+
+          const data = await res.json();
+
           if (data.bestmove) {
-            // Success: return all relevant info
             sendResponse({
               success: true,
-              fen: data.fen, // current board state
-              bestmove: data.bestmove, // best move in algebraic notation
-              from: data.from, // may be null
-              to: data.to, // may be null
+              fen: data.fen,
+              bestmove: data.bestmove,
+              from: data.from,
+              to: data.to,
               evaluation: data.evaluation,
             });
           } else {
@@ -191,11 +204,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               error: data.message || "Invalid response from ChessSolve API",
             });
           }
-        })
-        .catch((error) => {
+        } catch (error) {
           console.error("Error calling ChessSolve API:", error);
           sendResponse({ success: false, error: error.message });
-        });
+        }
+      });
 
       return true; // Keep async channel open
 

@@ -43,6 +43,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    //Get version
     const fetchData = async () => {
       const url = "https://www.chesssolve.com/api/version";
       const requestData = { version: version };
@@ -83,11 +84,14 @@ export default function App() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     chrome.runtime.sendMessage(
-      { action: "login", email: email, password: password },
+      { action: "login", email, password },
       async function (response) {
-        if (response.success) {
+        if (response.success && response.token) {
           setIsLoggedIn(true);
-          await chrome.storage.local.set({ email, password });
+          // Store email + token instead of password
+          await chrome.storage.local.set({ email, token: response.token });
+        } else {
+          console.error("Login failed:", response.status);
         }
       }
     );

@@ -161,38 +161,42 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return true; // Keep async channel open
 
     case "getMove":
-      if (!request.fen) {
-        sendResponse({ success: false, error: "FEN not provided" });
+      if (!request.moves) {
+        sendResponse({ success: false, error: "Moves not provided" });
         return;
       }
 
-      const stockfishUrl = `https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(
-        request.fen
-      )}&depth=12`;
-
-      fetch(stockfishUrl)
+      fetch("https://www.chesssolve.com/api/best", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ moves: request.moves }),
+      })
         .then((res) => res.json())
         .then((data) => {
-          if (data.success) {
-            const bestMove = data.bestmove.split(" ")[1];
+          if (data.bestmove) {
+            // Success: return all relevant info
             sendResponse({
               success: true,
-              bestmove: bestMove,
+              fen: data.fen, // current board state
+              bestmove: data.bestmove, // best move in algebraic notation
+              from: data.from, // may be null
+              to: data.to, // may be null
               evaluation: data.evaluation,
-              mate: data.mate,
-              continuation: data.continuation,
             });
           } else {
             sendResponse({
               success: false,
-              error: "Stockfish API returned failure",
+              error: data.message || "Invalid response from ChessSolve API",
             });
           }
         })
         .catch((error) => {
-          console.error("Error fetching Stockfish API:", error);
+          console.error("Error calling ChessSolve API:", error);
           sendResponse({ success: false, error: error.message });
         });
+
       return true; // Keep async channel open
 
     default:

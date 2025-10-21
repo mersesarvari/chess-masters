@@ -5,51 +5,20 @@ const chessCom = {
   moves: [],
 
   showMoves: async function (moves) {
-    // Make a POST request to the specified endpoint
-    async function fetchFen() {
-      try {
-        const response = await fetch("https://www.chesssolve.com/api/chess", {
-          // Replace with your actual endpoint
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json", // Specify content type as JSON
-          },
-          body: JSON.stringify({ moves }), // Send moves as JSON body
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response}`);
-        }
-        const data = await response.json();
-        console.log(`[ fetchFen ]: ${data}`);
-        return data;
-      } catch (error) {
-        console.error("Fetch error:", error); // Handle any errors that occur during fetch
-      }
-    }
-
-    const { fen } = await fetchFen();
-
     try {
       console.log("Asking for best move from the server...");
+      console.log("Moves:", moves);
       chrome.runtime.sendMessage(
-        { action: "getMove", fen: fen },
+        { action: "getMove", moves: moves },
         (response) => {
+          console.log("Response:", response);
           if (chrome.runtime.lastError) {
             console.error("Message failed:", chrome.runtime.lastError.message);
             return;
           }
 
-          if (response && response.success && response.continuation) {
-            const moves = response.continuation.split(" ");
-            const firstMove = moves[0];
-
-            if (firstMove.length === 4) {
-              const from = firstMove.substring(0, 2);
-              const to = firstMove.substring(2, 4);
-              console.log("Best move recieved: ", from, to);
-              chessCom.drawArrow(from, to);
-            }
+          if (response && response.success && response.from && response.to) {
+            chessCom.drawArrow(response.from, response.to);
           }
         }
       );

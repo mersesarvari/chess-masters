@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 
 export default function App() {
-  const version = "1.1.0";
+  const version = "1.2.0";
   const [versionOk, setVersionOk] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isBotRunning, setIsBotRunning] = useState(false);

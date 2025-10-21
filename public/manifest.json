@@ -10,9 +10,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["index.js", "lychess-board.js", "chess-board.js"],
-      "type": "module"
+      "matches": ["*://*.chess.com/*"],
+      "js": ["chess-board.js"]
+    },
+    {
+      "matches": ["*://*.lichess.org/*"],
+      "js": ["lychess-board.js"]
     }
   ],
   "action": {

@@ -1,3 +1,6 @@
+//chess-board.js (content scrypt)
+console.log("ChessCom content script loaded");
+
 const chessCom = {
   mycolor: "w",
   isActive: false,
@@ -330,16 +333,14 @@ const chessCom = {
 };
 
 chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
-  if (request.action === "startChessCom") {
-    console.log("[CHESS.COM]: Start command recieved");
-    await chessCom.Start();
-    //await chessCom.saveOnCheckMate();
-  }
-});
-
-chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
-  if (request.action === "stop") {
-    console.log("[CHESS.COM]: stop command recieved");
-    chessCom.Stop();
+  switch (request.action) {
+    case "startChessCom":
+      console.log("[CHESS.COM]: Start command received");
+      await chessCom.Start();
+      break;
+    case "stop":
+      console.log("[CHESS.COM]: Stop command received");
+      chessCom.Stop();
+      break;
   }
 });

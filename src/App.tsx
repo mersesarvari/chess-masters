@@ -1,3 +1,5 @@
+//App.tsx (Extension UI)
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -29,11 +31,11 @@ export default function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  // Initialize from storage on mount
   useEffect(() => {
-    chrome.storage.local.get(["email", "password", "running"], (result) => {
-      if (result.email && result.password) {
+    chrome.storage.local.get(["email", "token", "running"], (result) => {
+      if (result.email && result.token) {
         setEmail(result.email);
-        setPassword(result.password);
         setIsLoggedIn(true);
       }
       if (result.running) {
@@ -42,32 +44,47 @@ export default function App() {
     });
   }, []);
 
+  // Version check
   useEffect(() => {
-    //Get version
-    const fetchData = async () => {
-      const url = "https://www.chesssolve.com/api/version";
-      const requestData = { version: version };
+    const fetchVersion = async () => {
       try {
-        const response = await fetch(url, {
+        const res = await fetch("https://www.chesssolve.com/api/version", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestData),
+          body: JSON.stringify({ version }),
         });
-        const data = await response.json();
-        setVersionOk(data.status === 200);
+        const response = await res.json();
+        if (!response.ok) {
+          setVersionOk(false);
+        }
+        setVersionOk(true);
       } catch (error) {
+        console.error("Version check error:", error);
         setVersionOk(false);
-        console.error("Error:", error);
       }
     };
-    fetchData();
+    fetchVersion();
   }, []);
 
+  // Start/stop bot when state changes
   useEffect(() => {
     if (isLoggedIn) {
-      chrome.runtime.sendMessage({
-        action: isBotRunning ? "start" : "stop",
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (!tabs[0]?.id) return;
+
+        chrome.runtime.sendMessage(
+          { action: isBotRunning ? "start" : "stop" },
+          () => {
+            if (chrome.runtime.lastError) {
+              console.warn(
+                "No content script ready:",
+                chrome.runtime.lastError.message
+              );
+            }
+          }
+        );
       });
+
       chrome.storage.local.set({ running: isBotRunning });
     }
   }, [isBotRunning, isLoggedIn]);
@@ -76,16 +93,14 @@ export default function App() {
     e: React.MouseEvent<HTMLAnchorElement, MouseEvent>
   ) => {
     e.preventDefault();
-    chrome.tabs.create({
-      url: "https://www.chesssolve.com/register",
-    });
+    chrome.tabs.create({ url: "https://www.chesssolve.com/register" });
   };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     chrome.runtime.sendMessage(
       { action: "login", email, password },
-      async function (response) {
+      async (response) => {
         if (response.success && response.token) {
           setIsLoggedIn(true);
           // Store email + token instead of password
@@ -99,7 +114,7 @@ export default function App() {
 
   const handleLogout = () => {
     setIsLoggedIn(false);
-    chrome.storage.local.remove(["email", "password", "running"]);
+    chrome.storage.local.remove(["email", "token", "running"]);
     setIsBotRunning(false);
     setEmail("");
     setPassword("");
@@ -157,28 +172,24 @@ export default function App() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="Email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="bg-[#2f3437] border-[#424242] text-white placeholder-gray-400"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className="bg-[#2f3437] border-[#424242] text-white placeholder-gray-400"
-                  />
-                </div>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="bg-[#2f3437] border-[#424242] text-white placeholder-gray-400"
+                />
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="bg-[#2f3437] border-[#424242] text-white placeholder-gray-400"
+                />
                 <Button
                   type="submit"
                   className="w-full bg-[#7fa650] hover:bg-[#6c8c44] text-white"

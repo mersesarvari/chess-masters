@@ -1,3 +1,5 @@
+//bot.js (background script)
+
 let oldUrl = "";
 let url = "";
 
@@ -46,9 +48,13 @@ async function login(email, password, sendResponse) {
 
     if (response.ok && data.token) {
       // Store email + token instead of password
-      await chrome.storage.local.set({ email, token: data.token });
+      //await chrome.storage.local.set({ email, token: data.token });
       console.log("Login successful");
-      sendResponse({ status: "Login successful", success: true });
+      sendResponse({
+        status: "Login successful",
+        success: true,
+        token: data.token,
+      });
     } else {
       console.error("Login failed:", data.message);
       sendResponse({ status: `Login failed: ${data.message}`, success: false });
@@ -164,12 +170,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return true; // Keep async channel open
 
     case "getMove":
-      if (!request.moves) {
-        sendResponse({ success: false, error: "Moves not provided" });
+      if (!Array.isArray(request.moves)) {
+        sendResponse({
+          success: false,
+          error: "Moves not provided or invalid",
+        });
         return;
       }
 
-      // Retrieve stored token from extension storage
       chrome.storage.local.get(["token"], async (result) => {
         const token = result.token;
         if (!token) {
@@ -182,10 +190,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`, // <-- use the token here
+              Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({ moves: request.moves }),
           });
+
+          if (!res.ok) {
+            // HTTP error
+            sendResponse({
+              success: false,
+              error: `ChessSolve API returned status ${res.status}`,
+            });
+            return;
+          }
 
           const data = await res.json();
 

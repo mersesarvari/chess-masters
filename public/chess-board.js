@@ -355,7 +355,7 @@ chessCom.showRateLimitPopup = function () {
   // Avoid creating multiple popups
   if (document.querySelector("#chess-limit-popup")) return;
 
-  // Create overlay
+  // Overlay
   const overlay = document.createElement("div");
   overlay.id = "chess-limit-popup-overlay";
   overlay.style.position = "fixed";
@@ -363,46 +363,51 @@ chessCom.showRateLimitPopup = function () {
   overlay.style.left = 0;
   overlay.style.width = "100vw";
   overlay.style.height = "100vh";
-  overlay.style.background = "rgba(0,0,0,0.4)";
+  overlay.style.background = "rgba(0, 0, 0, 0.5)";
   overlay.style.zIndex = 9999;
   overlay.style.display = "flex";
   overlay.style.justifyContent = "center";
   overlay.style.alignItems = "center";
 
-  // Create popup
+  // Popup container
   const popup = document.createElement("div");
   popup.id = "chess-limit-popup";
-  popup.style.background = "#fff";
+  popup.style.background = "#2f3437"; // Bot background color
   popup.style.padding = "20px";
   popup.style.borderRadius = "10px";
-  popup.style.boxShadow = "0 4px 15px rgba(0,0,0,0.3)";
+  popup.style.boxShadow = "0 4px 15px rgba(0,0,0,0.5)";
   popup.style.maxWidth = "400px";
+  popup.style.width = "90%";
   popup.style.textAlign = "center";
   popup.style.fontFamily = "Arial, sans-serif";
+  popup.style.color = "#fff";
 
   popup.innerHTML = `
-    <h2 style="margin-bottom:10px; color:#333;">Daily Limit Reached</h2>
-    <p style="margin-bottom:15px; color:#555;">
-      You have reached your 20 requests/day limit. 
-      To continue using the bot, please support us on Ko-fi.
+    <h2 style="margin-bottom:10px; color:#7fa650;">Daily Limit Reached</h2>
+    <p style="margin-bottom:15px; color:#ccc;">
+      You have reached your <strong>20 requests/day</strong> limit.
+      Only <strong>monthly supporters</strong> get unlimited suggestions.
     </p>
     <a href="https://ko-fi.com/nazmox" target="_blank" style="
         display:inline-block;
         padding:10px 20px;
-        background:#ff5c5c;
+        background:#13C3FF;
         color:#fff;
         border-radius:5px;
         text-decoration:none;
+        font-weight:600;
         margin-bottom:10px;
-    ">Become a Supporter</a>
+    ">Support on Ko-fi</a>
     <br/>
     <button id="chess-limit-popup-close" style="
         padding:6px 12px;
         border:none;
-        background:#ccc;
+        background:#7fa650;
+        color:#fff;
         border-radius:5px;
         cursor:pointer;
         margin-top:10px;
+        font-weight:600;
     ">Close</button>
   `;
 

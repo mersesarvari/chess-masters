@@ -186,7 +186,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
 
         try {
-          // 1️⃣ Call backend API
           const res = await fetch("https://www.chesssolve.com/api/best", {
             method: "POST",
             headers: {
@@ -196,10 +195,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             body: JSON.stringify({ moves: request.moves }),
           });
 
-          // 2️⃣ Check HTTP error
           if (!res.ok) {
-            // Backend might return 429 if daily limit exceeded
             if (res.status === 429) {
+              // 1️⃣ Stop the bot
+              await Stop();
+              await chrome.storage.local.set({ active: "false" });
+
+              // 2️⃣ Notify content script to show popup
+              chrome.tabs.query(
+                { active: true, currentWindow: true },
+                (tabs) => {
+                  if (tabs[0]?.id) {
+                    chrome.tabs.sendMessage(tabs[0].id, {
+                      action: "rateLimitHit",
+                    });
+                  }
+                }
+              );
+
               sendResponse({
                 success: false,
                 error: "Daily limit reached (20 requests/day)",
@@ -213,7 +226,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             return;
           }
 
-          // 3️⃣ Parse response
           const data = await res.json();
 
           if (data.bestmove) {
@@ -224,8 +236,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               from: data.from,
               to: data.to,
               evaluation: data.evaluation,
-              dailyRequests: data.dailyRequests, // optional: show remaining count
-              premium: data.premium, // optional: show premium status
+              dailyRequests: data.dailyRequests, // optional
+              premium: data.premium, // optional
             });
           } else {
             sendResponse({

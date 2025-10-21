@@ -24,7 +24,9 @@ import {
 } from "lucide-react";
 
 export default function App() {
-  const version = "1.2.0";
+  // VERSION
+  const version = "1.3.0";
+
   const [versionOk, setVersionOk] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isBotRunning, setIsBotRunning] = useState(false);

@@ -25,13 +25,14 @@ import {
 
 export default function App() {
   // VERSION
-  const version = "1.3.0";
+  const version = "1.3.2";
 
   const [versionOk, setVersionOk] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isBotRunning, setIsBotRunning] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   // Initialize from storage on mount
   useEffect(() => {
@@ -100,15 +101,15 @@ export default function App() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginError(null); // reset previous error
     chrome.runtime.sendMessage(
       { action: "login", email, password },
       async (response) => {
         if (response.success && response.token) {
           setIsLoggedIn(true);
-          // Store email + token instead of password
           await chrome.storage.local.set({ email, token: response.token });
         } else {
-          console.error("Login failed:", response.status);
+          setLoginError("Login failed. Please try again.");
         }
       }
     );
@@ -173,6 +174,9 @@ export default function App() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {loginError && (
+                <p className="text-red-400 text-sm mb-2">{loginError}</p>
+              )}
               <form onSubmit={handleLogin} className="space-y-4">
                 <Input
                   id="email"

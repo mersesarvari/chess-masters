@@ -1,101 +1,75 @@
+// == LICHESS CONTENT SCRIPT ==
+console.log("Lichess content script loaded");
+
 const lychessOrg = {
   mycolor: "w",
   isActive: false,
   intervalId: null,
   moves: [],
 
+  showMoves: async function (moves) {
+    try {
+      console.log("Asking for best move from the server...");
+      chrome.runtime.sendMessage({ action: "getMove", moves }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error("Message failed:", chrome.runtime.lastError.message);
+          return;
+        }
+
+        if (response && response.success && response.from && response.to) {
+          lychessOrg.drawArrow(response.from, response.to);
+        } else if (response && response.error?.includes("Daily limit")) {
+          lychessOrg.showRateLimitPopup();
+        } else {
+          console.warn("Invalid move response:", response);
+        }
+      });
+    } catch (err) {
+      console.error("Failed to send message:", err);
+    }
+  },
+
   Start: async function () {
     lychessOrg.getColor();
+
     function boardHasChanged() {
       const currentMoves = lychessOrg.checkMoves();
       if (lychessOrg.moves.length < currentMoves.length) {
         lychessOrg.clearArrows();
         lychessOrg.moves = currentMoves;
-        console.log("[ MOVES ] : ", lychessOrg.moves);
         return true;
       } else {
         return false;
       }
     }
 
-    function myTurn(moves) {
-      if (lychessOrg.mycolor === "w" && moves.length % 2 === 0) {
-        return true;
-      }
-      if (lychessOrg.mycolor === "b" && moves.length % 2 === 1) {
-        return true;
-      }
+    const myTurn = (moves) => {
+      if (lychessOrg.mycolor === "w" && moves.length % 2 === 0) return true;
+      if (lychessOrg.mycolor === "b" && moves.length % 2 === 1) return true;
       return false;
-    }
-
-    async function showMoves(moves) {
-      // Make a POST request to the specified endpoint
-      async function fetchFen() {
-        try {
-          const response = await fetch("https://www.chesssolve.com/api/chess", {
-            // Replace with your actual endpoint
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json", // Specify content type as JSON
-            },
-            body: JSON.stringify({ moves }), // Send moves as JSON body
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response}`);
-          }
-
-          const data = await response.json();
-          return data;
-        } catch (error) {
-          console.error("Fetch error:", error); // Handle any errors that occur during fetch
-        }
-      }
-
-      const { fen } = await fetchFen();
-
-      chrome.runtime.sendMessage(
-        { action: "getMove", fen: fen },
-        (response) => {
-          if (response && response.success && response.continuation) {
-            const moves = response.continuation.split(" "); // ["e2e4", "d7d5", "e4e5", ...]
-            const firstMove = moves[0]; // e2e4
-
-            if (firstMove.length === 4) {
-              const from = firstMove.substring(0, 2);
-              const to = firstMove.substring(2, 4);
-              lychessOrg.drawArrow(from, to);
-            } else {
-              console.error("Unexpected move format:", firstMove);
-            }
-          } else {
-            console.error("Invalid response from background script", response);
-          }
-        }
-      );
-    }
+    };
 
     if (lychessOrg.isActive) {
       console.log("Already active.");
       return;
     }
-    lychessOrg.isActive = true;
 
+    lychessOrg.isActive = true;
     console.log("[ChessSolve]: Started");
-    //Showing move if no move happened and it is my turn (Im white)
-    if (myTurn(lychessOrg.moves) === true) {
+
+    if (myTurn(lychessOrg.moves)) {
       console.log("Show moves because this is my turn!");
-      await showMoves(lychessOrg.moves);
+      await lychessOrg.showMoves(lychessOrg.moves);
     }
-    //Showing moves if a move happened and it is my turn!
+
     lychessOrg.intervalId = setInterval(async function () {
-      if (boardHasChanged() === true && myTurn(lychessOrg.moves) === true) {
-        await showMoves(lychessOrg.moves);
+      if (boardHasChanged() && myTurn(lychessOrg.moves)) {
+        await lychessOrg.showMoves(lychessOrg.moves);
       }
     }, 100);
   },
 
-  Stop: async function () {
+  Stop: function () {
     if (lychessOrg.intervalId) {
       clearInterval(lychessOrg.intervalId);
       lychessOrg.intervalId = null;
@@ -105,124 +79,82 @@ const lychessOrg = {
     lychessOrg.isActive = false;
     lychessOrg.clearArrows();
     console.log("[ChessSolve]: Stopped");
+    chrome.runtime.sendMessage({ action: "stoppedAck" });
   },
 
   saveOnCheckMate: async function () {
     let checkInterval = null;
     if (!lychessOrg.isActive) {
       lychessOrg.moves = [];
-      clearInterval(checkInterval);
+      lychessOrg.isActive = false;
       return;
     } else {
       checkInterval = setInterval(async () => {
         const pageText = document.body.innerText || document.body.textContent;
 
-        //Options when the game ended
         const blackWon = pageText?.includes("Black is victorious");
         const whiteWon = pageText?.includes("White is victorious");
         const gameAborted = pageText?.includes("Game aborted");
         const draw = pageText?.includes("Draw");
 
-        // Check if the text contains keywords indicating game over or checkmate
-        // ! TODO: Checking draw or stealmate
         const isGameOver = blackWon || whiteWon || gameAborted || draw;
 
-        // Check if game is over and if a winner is found
         if (isGameOver) {
           lychessOrg.clearArrows();
 
           let winColor = "-";
-          if (whiteWon) {
-            winColor = "w";
-            console.log("[GAME ENDED]: White Won!");
-          } else if (blackWon) {
-            winColor = "b";
-            console.log("[GAME ENDED]: Black Won!");
-          } else {
-            winColor = "-";
-            console.log("[GAME ENDED]: Draw");
-          }
+          if (whiteWon) winColor = "w";
+          else if (blackWon) winColor = "b";
+          else winColor = "-";
 
-          // Fetch email asynchronously
           chrome.storage.local.get(["email"], async (result) => {
             const email = result.email;
+            if (!email) return;
 
-            if (!email) {
-              // If no email found, stop:
-              return;
-            }
-
-            // Prepare the game object
             const gameObject = {
               moves: lychessOrg.moves,
-              winColor: winColor,
+              winColor,
               myColor: lychessOrg.mycolor,
-              email: email, // Use the email retrieved from storage
+              email,
             };
 
-            // Saving the game to the database
             try {
               const response = await fetch(
                 "https://www.chesssolve.com/api/game",
                 {
                   method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
+                  headers: { "Content-Type": "application/json" },
                   body: JSON.stringify(gameObject),
                 }
               );
 
-              if (!response.ok) {
+              if (!response.ok)
                 console.error("Cannot save the game to the database!");
-              } else {
-                console.log("Game saved to the database!");
-              }
+              else console.log("Game saved to the database!");
             } catch (error) {
               console.error("Cannot save the game to the database!", error);
             }
+
             lychessOrg.moves = [];
           });
         }
-      }, 200); // Check every 1000 milliseconds (1 second)
-    }
-  },
-
-  getWinner: async function () {
-    // Select the element containing the header with the winner text
-    const winnerElement = document.querySelector(
-      "#main-wrap > main > aside > div > section.status"
-    );
-
-    // If the element exists, retrieve and return the text content (e.g., "White Won")
-    if (winnerElement) {
-      return winnerElement?.textContent?.trim();
-    } else {
-      return "Winner not found";
+      }, 200);
     }
   },
 
   checkMoves: function () {
-    // Select all move pairs (each `i5z` contains a number, and its sibling `kwdb` contains moves)
     const moveNodes = document.querySelectorAll("i5z");
-
-    // Array to store the extracted moves
     const moves = [];
 
-    // Loop through each move number node
     moveNodes.forEach((moveNode) => {
-      // Get the white move (first sibling `kwdb`)
       const whiteMove = moveNode?.nextElementSibling?.textContent?.trim();
-
-      // Get the black move (second sibling `kwdb`)
       const blackMove =
         moveNode?.nextElementSibling?.nextElementSibling?.textContent?.trim();
 
-      // Add moves to the list (only include if they exist)
       if (whiteMove) moves.push(whiteMove);
       if (blackMove) moves.push(blackMove);
     });
-    //console.log("[MOVES] :", moves);
+
     return moves;
   },
 
@@ -232,8 +164,7 @@ const lychessOrg = {
       console.error("Chess board not found.");
       return;
     }
-    // Check if the next element has the "manipulated" attribute
-    if (board && board.className.includes("orientation-white")) {
+    if (board.className.includes("orientation-white")) {
       lychessOrg.mycolor = "w";
       console.log("You are with the white pieces.");
     } else {
@@ -244,129 +175,158 @@ const lychessOrg = {
 
   chessNotationToMatrix: function (chessNotation) {
     const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
-
-    // Extract the file and rank from the chess notation
-    const file = chessNotation.charAt(0); // First character (file)
-    const rank = parseInt(chessNotation.charAt(1)); // Second character (rank)
-
-    // Calculate the column index (0-7)
+    const file = chessNotation.charAt(0);
+    const rank = parseInt(chessNotation.charAt(1));
     const col = files.indexOf(file);
-
-    // Calculate the row index (0-7) based on the rank
-    const row = 8 - rank; // Convert rank to 0-based index (8 -> 0, 1 -> 7, etc.)
-
-    return { row, col }; // Return as an object
+    const row = 8 - rank;
+    return { row, col };
   },
 
   drawArrow: function (from, to) {
-    let isFlipped = lychessOrg.mycolor === "b";
-
-    console.log(`[ DrawArrow ]: ${from} ---> ${to}`);
-    const svg = document.querySelector(".cg-shapes"); // Get the SVG container
-
-    // Convert chess squares to matrix coordinates
+    const svg = document.querySelector(".cg-shapes");
     const fromCoord = lychessOrg.chessNotationToMatrix(from);
     const toCoord = lychessOrg.chessNotationToMatrix(to);
 
-    // Map chessboard rows and columns (0-7) to the SVG `viewBox` range (-4 to 4)
     const mapToSvg = (value) => -4 + (value / 7) * 8;
+    const isFlipped = lychessOrg.mycolor === "b";
+    const adjust = (v) => (isFlipped ? 7 - v : v);
 
-    // Adjust coordinates based on whether the board is flipped
-    const adjustRow = (row) => (isFlipped ? 7 - row : row);
-    const adjustCol = (col) => (isFlipped ? 7 - col : col);
+    const fromX = mapToSvg(adjust(fromCoord.col));
+    const fromY = mapToSvg(adjust(fromCoord.row));
+    const toX = mapToSvg(adjust(toCoord.col));
+    const toY = mapToSvg(adjust(toCoord.row));
 
-    // Correctly adjust both rows and columns for flipped boards
-    const adjustedFromRow = adjustRow(fromCoord.row);
-    const adjustedFromCol = adjustCol(fromCoord.col);
-    const adjustedToRow = adjustRow(toCoord.row);
-    const adjustedToCol = adjustCol(toCoord.col);
-
-    // Define SVG coordinates based on the adjusted matrix coordinates
-    const fromX = mapToSvg(adjustedFromCol);
-    const fromY = mapToSvg(adjustedFromRow); // Correctly flipped Y-axis
-    const toX = mapToSvg(adjustedToCol);
-    const toY = mapToSvg(adjustedToRow); // Correctly flipped Y-axis
-
-    // Calculate angle for the arrow
     const angle = Math.atan2(toY - fromY, toX - fromX);
-
-    // Define the arrowhead size and line width
-    const arrowHeadSize = 0.3; // Scaled down for the SVG's coordinate system
-    const lineWidth = 0.1; // Thin line width for the SVG coordinate space
+    const arrowHeadSize = 0.3;
+    const lineWidth = 0.1;
     const lineLengthAdjustment = arrowHeadSize * 0.75;
 
-    // Calculate adjusted end points for the line
     const adjustedToX = toX - lineLengthAdjustment * Math.cos(angle);
     const adjustedToY = toY - lineLengthAdjustment * Math.sin(angle);
 
-    // Create a new <line> element for the arrow
     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-
-    // Set the attributes for the line
-    line.setAttribute("x1", fromX.toString());
-    line.setAttribute("y1", fromY.toString());
-    line.setAttribute("x2", adjustedToX.toString());
-    line.setAttribute("y2", adjustedToY.toString());
-    line.setAttribute("stroke", "rgb(16, 31, 163)"); // Line color
-    line.setAttribute("stroke-width", lineWidth.toString()); // Line width
-    line.setAttribute("opacity", "1"); // Line opacity
+    line.setAttribute("x1", fromX);
+    line.setAttribute("y1", fromY);
+    line.setAttribute("x2", adjustedToX);
+    line.setAttribute("y2", adjustedToY);
+    line.setAttribute("stroke", "rgb(16, 31, 163)");
+    line.setAttribute("stroke-width", lineWidth);
+    line.setAttribute("opacity", "1");
     line.setAttribute("data-arrow", `${from}${to}`);
-    line.setAttribute("id", `line-${from}${to}`); // Use 'line' in ID
-
-    // Append the line to the SVG container
+    line.setAttribute("id", `line-${from}${to}`);
     svg?.appendChild(line);
 
-    // Create a new <polygon> element for the arrowhead
     const arrowhead = document.createElementNS(
       "http://www.w3.org/2000/svg",
       "polygon"
     );
-
-    // Define points for the arrowhead (adjusted for the smaller SVG scale)
     const arrowheadPoints = `
-          0,0 
-          -${arrowHeadSize},${arrowHeadSize / 2} 
-          -${arrowHeadSize},-${arrowHeadSize / 2}
-      `;
-
-    // Set the attributes for the arrowhead
+      0,0 
+      -${arrowHeadSize},${arrowHeadSize / 2} 
+      -${arrowHeadSize},-${arrowHeadSize / 2}
+    `;
     arrowhead.setAttribute("points", arrowheadPoints);
-    arrowhead.setAttribute("fill", "rgb(16, 31, 163)"); // Color of the arrowhead
-    arrowhead.setAttribute("opacity", "1"); // Arrowhead opacity
+    arrowhead.setAttribute("fill", "rgb(16, 31, 163)");
+    arrowhead.setAttribute("opacity", "1");
     arrowhead.setAttribute("data-arrowhead", `${from}${to}`);
-    arrowhead.setAttribute("id", `arrowhead-${from}${to}`); // Use 'arrowhead' in ID
-
-    // Position the arrowhead at the end of the line
+    arrowhead.setAttribute("id", `arrowhead-${from}${to}`);
     arrowhead.setAttribute(
       "transform",
       `translate(${toX}, ${toY}) rotate(${angle * (180 / Math.PI)})`
     );
-
-    // Append the arrowhead to the SVG container
     svg?.appendChild(arrowhead);
   },
 
   clearArrows: function () {
-    const svg = document.querySelector(".cg-shapes"); // Get the SVG container
-    const arrows = svg.querySelectorAll("line, polygon"); // Select all lines and polygons (arrows)
-
-    arrows.forEach((arrow) => {
-      svg.removeChild(arrow); // Remove each arrow from the SVG container
-    });
+    const svg = document.querySelector(".cg-shapes");
+    const arrows = svg?.querySelectorAll("line, polygon");
+    arrows?.forEach((arrow) => svg?.removeChild(arrow));
   },
 };
 
-chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
-  if (request.action === "startLychessOrg") {
-    console.log("[LYCHESS]: Start command recieved");
-    await lychessOrg.Start();
-    //await lychessOrg.saveOnCheckMate();
-  }
-});
+// --------------------
+// Popup function
+// --------------------
+lychessOrg.showRateLimitPopup = function () {
+  if (document.querySelector("#chess-limit-popup")) return;
 
-chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
-  if (request.action === "stop") {
-    console.log("[LYCHESS]: stop command recieved");
-    lychessOrg.Stop();
+  const overlay = document.createElement("div");
+  overlay.id = "chess-limit-popup-overlay";
+  Object.assign(overlay.style, {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    width: "100vw",
+    height: "100vh",
+    background: "rgba(0,0,0,0.5)",
+    zIndex: 9999,
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+  });
+
+  const popup = document.createElement("div");
+  popup.id = "chess-limit-popup";
+  Object.assign(popup.style, {
+    background: "#2f3437",
+    padding: "20px",
+    borderRadius: "10px",
+    boxShadow: "0 4px 15px rgba(0,0,0,0.5)",
+    maxWidth: "400px",
+    width: "90%",
+    textAlign: "center",
+    fontFamily: "Arial, sans-serif",
+    color: "#fff",
+  });
+
+  popup.innerHTML = `
+    <h2 style="margin-bottom:10px; color:#7fa650;">Daily Limit Reached</h2>
+    <p style="margin-bottom:15px; color:#ccc;">
+      You have reached your daily limit.<br>
+      Only <strong>monthly supporters</strong> get unlimited suggestions.
+    </p>
+    <a href="https://ko-fi.com/nazmox" target="_blank" style="
+      display:inline-block;
+      padding:10px 20px;
+      background:#13C3FF;
+      color:#fff;
+      border-radius:5px;
+      text-decoration:none;
+      font-weight:600;
+      margin-bottom:10px;
+    ">Support on Ko-fi</a><br/>
+    <button id="chess-limit-popup-close" style="
+      padding:6px 12px;
+      border:none;
+      background:#7fa650;
+      color:#fff;
+      border-radius:5px;
+      cursor:pointer;
+      margin-top:10px;
+      font-weight:600;
+    ">Close</button>
+  `;
+
+  overlay.appendChild(popup);
+  document.body.appendChild(overlay);
+
+  document
+    .getElementById("chess-limit-popup-close")
+    .addEventListener("click", () => document.body.removeChild(overlay));
+};
+
+// --------------------
+// Chrome listeners
+// --------------------
+chrome.runtime.onMessage.addListener(async (request) => {
+  switch (request.action) {
+    case "startLichessOrg":
+      console.log("[LYCHESS]: Start command received");
+      await lychessOrg.Start();
+      break;
+    case "stop":
+      console.log("[LYCHESS]: Stop command received");
+      lychessOrg.Stop();
+      break;
   }
 });

@@ -385,7 +385,7 @@ chessCom.showRateLimitPopup = function () {
   popup.innerHTML = `
     <h2 style="margin-bottom:10px; color:#7fa650;">Daily Limit Reached</h2>
     <p style="margin-bottom:15px; color:#ccc;">
-      You have reached your <strong>20 requests/day</strong> limit.
+      You have reached your daily limit.
       Only <strong>monthly supporters</strong> get unlimited suggestions.
     </p>
     <a href="https://ko-fi.com/nazmox" target="_blank" style="

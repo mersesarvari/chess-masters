@@ -154,7 +154,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (chrome.runtime.lastError) console.error(chrome.runtime.lastError);
         else console.log("[BOT]: active=true");
       });
-      StartCommand();
+      //StartCommand();
       break;
 
     case "stop":
@@ -228,16 +228,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
           const data = await res.json();
 
-          if (data.bestmove) {
+          if (data.from && data.to && data.fen) {
             sendResponse({
               success: true,
               fen: data.fen,
-              bestmove: data.bestmove,
               from: data.from,
               to: data.to,
-              evaluation: data.evaluation,
-              dailyRequests: data.dailyRequests, // optional
-              premium: data.premium, // optional
             });
           } else {
             sendResponse({

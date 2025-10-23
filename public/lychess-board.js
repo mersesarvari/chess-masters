@@ -67,6 +67,9 @@ const lychessOrg = {
         await lychessOrg.showMoves(lychessOrg.moves);
       }
     }, 100);
+
+    // ✅ start monitoring game over
+    lychessOrg.saveOnCheckMate();
   },
 
   Stop: function () {

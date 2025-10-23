@@ -82,64 +82,66 @@ const lychessOrg = {
     chrome.runtime.sendMessage({ action: "stoppedAck" });
   },
 
-  saveOnCheckMate: async function () {
-    let checkInterval = null;
+  saveOnCheckMate: function () {
+    console.log("saveOnCheckMate called");
+
     if (!lychessOrg.isActive) {
+      console.log("Lichess not active");
       lychessOrg.moves = [];
-      lychessOrg.isActive = false;
       return;
-    } else {
-      checkInterval = setInterval(async () => {
-        const pageText = document.body.innerText || document.body.textContent;
-
-        const blackWon = pageText?.includes("Black is victorious");
-        const whiteWon = pageText?.includes("White is victorious");
-        const gameAborted = pageText?.includes("Game aborted");
-        const draw = pageText?.includes("Draw");
-
-        const isGameOver = blackWon || whiteWon || gameAborted || draw;
-
-        if (isGameOver) {
-          lychessOrg.clearArrows();
-
-          let winColor = "-";
-          if (whiteWon) winColor = "w";
-          else if (blackWon) winColor = "b";
-          else winColor = "-";
-
-          chrome.storage.local.get(["email"], async (result) => {
-            const email = result.email;
-            if (!email) return;
-
-            const gameObject = {
-              moves: lychessOrg.moves,
-              winColor,
-              myColor: lychessOrg.mycolor,
-              email,
-            };
-
-            try {
-              const response = await fetch(
-                "https://www.chesssolve.com/api/game",
-                {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(gameObject),
-                }
-              );
-
-              if (!response.ok)
-                console.error("Cannot save the game to the database!");
-              else console.log("Game saved to the database!");
-            } catch (error) {
-              console.error("Cannot save the game to the database!", error);
-            }
-
-            lychessOrg.moves = [];
-          });
-        }
-      }, 200);
     }
+
+    const checkInterval = setInterval(() => {
+      const pageText = document.body.innerText || document.body.textContent;
+
+      const blackWon = pageText?.includes("Black is victorious");
+      const whiteWon = pageText?.includes("White is victorious");
+      const gameAborted = pageText?.includes("Game aborted");
+      const draw = pageText?.includes("Draw");
+
+      const isGameOver = blackWon || whiteWon || gameAborted || draw;
+
+      if (!isGameOver) return;
+
+      // ✅ Clear arrows
+      lychessOrg.clearArrows();
+
+      // Determine winner
+      let winColor = "-"; // default draw/aborted
+      if (whiteWon) winColor = "w";
+      else if (blackWon) winColor = "b";
+
+      // Fetch email and send to background
+      chrome.storage.local.get(["email"], (result) => {
+        const email = result.email;
+        if (!email) return;
+
+        const gameObject = {
+          moves: lychessOrg.moves,
+          winColor,
+          myColor: lychessOrg.mycolor,
+          sourcee: "lichess.com",
+          email,
+        };
+
+        console.log("Sending game to background for saving:", gameObject);
+
+        chrome.runtime.sendMessage(
+          { action: "saveGame", game: gameObject },
+          (response) => {
+            if (response?.success) {
+              console.log("Background confirmed game saved!");
+            } else {
+              console.error("Background failed to save game");
+            }
+          }
+        );
+      });
+
+      // ✅ Stop checking immediately after sending
+      clearInterval(checkInterval);
+      lychessOrg.moves = [];
+    }, 500); // check twice a second
   },
 
   checkMoves: function () {

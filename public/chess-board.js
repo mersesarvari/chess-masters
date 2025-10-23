@@ -75,6 +75,10 @@ const chessCom = {
         await chessCom.showMoves(chessCom.moves);
       }
     }, 100);
+
+    // ✅ Start monitoring for game over
+    console.log("[ChessSolve] Starting saveOnCheckMate");
+    chessCom.saveOnCheckMate();
   },
 
   Stop: function () {
@@ -90,84 +94,64 @@ const chessCom = {
     chrome.runtime.sendMessage({ action: "stoppedAck" });
   },
 
-  saveOnCheckMate: async function () {
-    let checkInterval = null;
+  saveOnCheckMate: function () {
+    console.log("saveOnCheckMate called");
+
     if (!chessCom.isActive) {
+      console.log("ChessCom not active");
       chessCom.moves = [];
-      chessCom.isActive = false;
       return;
-    } else {
-      checkInterval = setInterval(async () => {
-        const pageText = document.body.innerText || document.body.textContent;
-
-        const isGameOver = pageText?.includes("Game Review");
-
-        // Check if game is over and if a winner is found
-        if (isGameOver) {
-          chessCom.clearArrows();
-
-          const mewon = pageText?.includes("You Won!");
-          const blackWon = pageText?.includes("Black Won!");
-          const whiteWon = pageText?.includes("White Won!");
-          const draw = pageText?.includes("Draw");
-
-          let winColor = "w"; // Initialize winColor
-          if (mewon) {
-            console.log(`You won with ${chessCom.mycolor}`);
-            winColor = chessCom.mycolor;
-          } else if (blackWon || whiteWon) {
-            console.log(
-              `Opponent won with ${chessCom.mycolor === "w" ? "b" : "w"}`
-            );
-            winColor = chessCom.mycolor === "w" ? "b" : "w";
-          } else if (draw) {
-            winColor = "-";
-            console.log("Draw");
-          }
-
-          // Fetch email asynchronously
-          chrome.storage.local.get(["email"], async (result) => {
-            const email = result.email;
-
-            if (!email) {
-              // If no email found, stop:
-              return;
-            }
-
-            // Prepare the game object
-            const gameObject = {
-              moves: chessCom.moves,
-              winColor: winColor,
-              myColor: chessCom.mycolor,
-              email: email, // Use the email retrieved from storage
-            };
-
-            // Saving the game to the database
-            try {
-              const response = await fetch(
-                "https://www.chesssolve.com/api/game",
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify(gameObject),
-                }
-              );
-
-              if (!response.ok) {
-                console.error("Cannot save the game to the database!");
-              } else {
-                console.log("Game saved to the database!");
-              }
-            } catch (error) {
-              console.error("Cannot save the game to the database!", error);
-            }
-            chessCom.moves = [];
-          });
-        }
-      }, 100); // Check every 1000 milliseconds (1 second)
     }
+
+    const checkInterval = setInterval(() => {
+      const pageText = document.body.innerText || document.body.textContent;
+      const isGameOver = pageText?.includes("Game Review");
+      if (!isGameOver) return;
+
+      chessCom.clearArrows();
+
+      const mewon = pageText?.includes("You Won!");
+      const blackWon = pageText?.includes("Black Won!");
+      const whiteWon = pageText?.includes("White Won!");
+      const draw = pageText?.includes("Draw");
+
+      let winColor = "-"; // default draw
+      if (mewon) winColor = chessCom.mycolor;
+      else if (blackWon || whiteWon)
+        winColor = chessCom.mycolor === "w" ? "b" : "w";
+
+      // Prepare game data
+      chrome.storage.local.get(["email"], (result) => {
+        const email = result.email;
+        if (!email) return;
+
+        const gameObject = {
+          moves: chessCom.moves,
+          winColor,
+          myColor: chessCom.mycolor,
+          email,
+          source: "chess.com",
+        };
+
+        console.log("Sending game to background for saving:", gameObject);
+
+        // Send message to background to save
+        chrome.runtime.sendMessage(
+          { action: "saveGame", game: gameObject },
+          (response) => {
+            if (response?.success) {
+              console.log("Background confirmed game saved!");
+            } else {
+              console.error("Background failed to save game");
+            }
+          }
+        );
+      });
+
+      // ✅ Stop the interval immediately after sending the game once
+      clearInterval(checkInterval);
+      chessCom.moves = [];
+    }, 500); // check twice a second
   },
 
   getWinner: function () {

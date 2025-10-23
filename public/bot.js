@@ -249,6 +249,37 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       return true; // Keep async channel open
 
+    case "saveGame":
+      // ✅ New case to save the game
+      const game = request.game;
+      if (!game) {
+        sendResponse({ success: false, error: "No game data provided" });
+        return;
+      }
+
+      (async () => {
+        try {
+          const res = await fetch("https://www.chesssolve.com/api/game", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(game),
+          });
+
+          if (res.ok) {
+            console.log("Game saved successfully in background!");
+            sendResponse({ success: true });
+          } else {
+            console.error("Failed to save game. Status:", res.status);
+            sendResponse({ success: false, error: "Failed to save game" });
+          }
+        } catch (err) {
+          console.error("Error saving game in background:", err);
+          sendResponse({ success: false, error: err.message });
+        }
+      })();
+
+      return true; // Keep async channel open
+
     default:
       console.warn("Unknown action:", request.action);
   }

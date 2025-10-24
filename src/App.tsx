@@ -25,7 +25,7 @@ import {
 
 export default function App() {
   // VERSION
-  const version = "1.3.4";
+  const version = "1.3.5";
 
   const [versionOk, setVersionOk] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);

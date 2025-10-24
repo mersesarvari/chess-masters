@@ -1,10 +1,10 @@
-//chess-board.js (content scrypt)
+// chess-board.js (content script)
 console.log("ChessCom content script loaded");
 
 const chessCom = {
   mycolor: "w",
   isActive: false,
-  intervalId: null,
+  observer: null,
   moves: [],
 
   showMoves: async function (moves) {
@@ -23,7 +23,6 @@ const chessCom = {
           if (response && response.success && response.from && response.to) {
             chessCom.drawArrow(response.from, response.to);
           } else if (response && response.error?.includes("Daily limit")) {
-            // Show rate limit popup
             chessCom.showRateLimitPopup();
           }
         }
@@ -35,98 +34,104 @@ const chessCom = {
 
   Start: async function () {
     chessCom.getColor();
-    function boardHasChanged() {
-      const moveNodes = chessCom.checkMoves();
-      const currentMoves = moveNodes.map((node) => node.moveText);
-      if (chessCom.moves.length < currentMoves.length) {
-        chessCom.clearArrows();
-        chessCom.moves = currentMoves;
-        return true;
-      } else {
-        return false;
-      }
-    }
-
-    const myTurn = (moves) => {
-      if (chessCom.mycolor === "w" && moves.length % 2 === 0) {
-        return true;
-      }
-      if (chessCom.mycolor === "b" && moves.length % 2 === 1) {
-        return true;
-      }
-      return false;
-    };
 
     if (chessCom.isActive) {
       console.log("Already active.");
       return;
     }
+
     chessCom.isActive = true;
-
     console.log("[ChessSolve]: Started");
-    //Showing move if no move happened and it is my turn (Im white)
-    if (myTurn(chessCom.moves) === true) {
-      console.log("Show moves because this is my turn!");
-      await chessCom.showMoves(chessCom.moves);
-    }
-    //Showing moves if a move happened and it is my turn!
-    chessCom.intervalId = setInterval(async function () {
-      if (boardHasChanged() === true && myTurn(chessCom.moves) === true) {
-        await chessCom.showMoves(chessCom.moves);
-      }
-    }, 100);
 
-    // ✅ Start monitoring for game over
-    console.log("[ChessSolve] Starting saveOnCheckMate");
+    const myTurn = () =>
+      (chessCom.mycolor === "w" && chessCom.moves.length % 2 === 0) ||
+      (chessCom.mycolor === "b" && chessCom.moves.length % 2 === 1);
+
+    // Wait for <wc-simple-move-list> to load
+    const waitForMoveList = async () => {
+      for (let i = 0; i < 20; i++) {
+        const el = document.querySelector("wc-simple-move-list");
+        if (el) return el;
+        await new Promise((res) => setTimeout(res, 500));
+      }
+      return null;
+    };
+
+    const moveListElement = await waitForMoveList();
+    if (!moveListElement) {
+      console.warn("Move list component not found!");
+      return;
+    }
+
+    const shadowRoot = moveListElement.shadowRoot || moveListElement;
+    const movesContainer = shadowRoot.querySelector("div");
+    if (!movesContainer) {
+      console.warn("No move container inside move list!");
+      return;
+    }
+
+    // Initial capture
+    chessCom.moves = chessCom.checkMoves().map((n) => n.moveText);
+
+    // Observe shadow DOM changes to capture moves live
+    chessCom.observer = new MutationObserver(async () => {
+      const currentMoves = chessCom.checkMoves().map((n) => n.moveText);
+      if (currentMoves.length > chessCom.moves.length) {
+        const newMoves = currentMoves.slice(chessCom.moves.length);
+        chessCom.moves.push(...newMoves);
+        chessCom.clearArrows();
+        if (myTurn()) await chessCom.showMoves(chessCom.moves);
+      }
+    });
+
+    chessCom.observer.observe(movesContainer, {
+      childList: true,
+      subtree: true,
+    });
+
+    if (myTurn()) await chessCom.showMoves(chessCom.moves);
+
+    // Start monitoring for game over
     chessCom.saveOnCheckMate();
   },
 
   Stop: function () {
-    if (chessCom.intervalId) {
-      clearInterval(chessCom.intervalId);
-      chessCom.intervalId = null;
+    if (chessCom.observer) {
+      chessCom.observer.disconnect();
+      chessCom.observer = null;
     }
-
     chessCom.moves = [];
-    chessCom.isActive = false; // ✅ ensure reset
+    chessCom.isActive = false;
     chessCom.clearArrows();
     console.log("[ChessSolve]: Stopped");
     chrome.runtime.sendMessage({ action: "stoppedAck" });
   },
 
   saveOnCheckMate: function () {
-    console.log("saveOnCheckMate called");
+    if (!chessCom.isActive) return;
 
-    if (!chessCom.isActive) {
-      console.log("ChessCom not active");
-      chessCom.moves = [];
-      return;
-    }
+    const interval = setInterval(() => {
+      const resultEl = document.querySelector(
+        ".main-line-row.move-list-row.result-row .game-result"
+      );
+      if (!resultEl) return; // Game not finished yet
 
-    const checkInterval = setInterval(() => {
-      const pageText = document.body.innerText || document.body.textContent;
-      const isGameOver = pageText?.includes("Game Review");
-      if (!isGameOver) return;
-
+      const resultText = resultEl.textContent.trim();
       chessCom.clearArrows();
 
-      const mewon = pageText?.includes("You Won!");
-      const blackWon = pageText?.includes("Black Won!");
-      const whiteWon = pageText?.includes("White Won!");
-      const draw = pageText?.includes("Draw");
+      let winColor = "-";
+      if (resultText === "1-0") winColor = "w";
+      else if (resultText === "0-1") winColor = "b";
+      else if (resultText === "½-½") winColor = "draw";
 
-      let winColor = "-"; // default draw
-      if (mewon) winColor = chessCom.mycolor;
-      else if (blackWon || whiteWon)
-        winColor = chessCom.mycolor === "w" ? "b" : "w";
+      const finalMoves = [...chessCom.moves];
 
-      // Prepare game data
       chrome.storage.local.get(["email"], (result) => {
         const email = result.email;
         if (!email) return;
 
         const gameObject = {
-          moves: chessCom.moves,
+          moves: finalMoves,
           winColor,
           myColor: chessCom.mycolor,
           email,
@@ -134,71 +139,48 @@ const chessCom = {
         };
 
         console.log("Sending game to background for saving:", gameObject);
-
-        // Send message to background to save
         chrome.runtime.sendMessage(
           { action: "saveGame", game: gameObject },
-          (response) => {
-            if (response?.success) {
-              console.log("Background confirmed game saved!");
-            } else {
-              console.error("Background failed to save game");
-            }
+          (res) => {
+            if (res?.success) console.log("Game saved successfully!");
+            else console.error("Failed to save game.");
           }
         );
       });
 
-      // ✅ Stop the interval immediately after sending the game once
-      clearInterval(checkInterval);
+      clearInterval(interval);
       chessCom.moves = [];
-    }, 500); // check twice a second
+    }, 500);
   },
 
   getWinner: function () {
-    // Select the element containing the header with the winner text
     const winnerElement = document.querySelector(".header-title-component");
-
-    // If the element exists, retrieve and return the text content (e.g., "White Won")
-    if (winnerElement) {
-      return winnerElement?.textContent?.trim();
-    } else {
-      return "Winner not found";
-    }
+    return winnerElement
+      ? winnerElement.textContent.trim()
+      : "Winner not found";
   },
 
   checkMoves: function () {
     try {
-      // Select all div elements with class 'node'
-      const moves = document.querySelectorAll(".node");
-
-      // Create an array to store the extracted moves
-      const extractedMoves = [];
-
-      // Loop through the selected div elements
-      moves.forEach((move) => {
+      const nodes = document.querySelectorAll(".node");
+      const result = [];
+      nodes.forEach((move) => {
         let moveText = "";
-        // Extract the data-node attribute and the move text inside the span
         const dataNode = move.getAttribute("data-node");
-        //Checkin if the span has a span with the moving piece icon:
         const pieceIcon = move?.querySelector("span[data-figurine]");
-        //If it has an icon, extract the text
-        if (pieceIcon === null) {
+        if (!pieceIcon) {
           moveText = move?.querySelector("span")?.textContent?.trim();
         } else {
           const iconValue = pieceIcon.getAttribute("data-figurine");
           moveText = `${iconValue}${move
-            ?.querySelector("span")
+            .querySelector("span")
             ?.textContent?.trim()}`;
         }
-
-        // If move text is available, store the result
-        if (moveText) {
-          extractedMoves.push({ dataNode, moveText });
-        }
+        if (moveText) result.push({ dataNode, moveText });
       });
-      return extractedMoves;
-    } catch (error) {
-      console.error("checkMoves failed:", error);
+      return result;
+    } catch (err) {
+      console.error("checkMoves failed:", err);
       return [];
     }
   },
@@ -207,115 +189,71 @@ const chessCom = {
     const board =
       document.querySelector("#board-play-computer") ||
       document.querySelector("#board-single");
-    if (!board) {
-      console.error("Chess board not found.");
-      return;
-    }
-    if (board.className.includes("flipped")) {
-      chessCom.mycolor = "b";
-      console.log("You are with the black pieces.");
-    } else {
-      chessCom.mycolor = "w";
-      console.log("You are with the white pieces.");
-    }
+    if (!board) return console.error("Chess board not found.");
+    chessCom.mycolor = board.className.includes("flipped") ? "b" : "w";
+    console.log(
+      "You are with the",
+      chessCom.mycolor === "w" ? "white" : "black",
+      "pieces."
+    );
   },
 
   chessNotationToMatrix: function (chessNotation) {
     const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
-
-    // Extract the file and rank from the chess notation
-    const file = chessNotation.charAt(0); // First character (file)
-    const rank = parseInt(chessNotation.charAt(1)); // Second character (rank)
-
-    // Calculate the column index (0-7)
-    const col = files.indexOf(file);
-
-    // Calculate the row index (0-7) based on the rank
-    const row = 8 - rank; // Convert rank to 0-based index (8 -> 0, 1 -> 7, etc.)
-
-    return { row, col }; // Return as an object
+    const file = chessNotation.charAt(0);
+    const rank = parseInt(chessNotation.charAt(1));
+    return { row: 8 - rank, col: files.indexOf(file) };
   },
 
   drawArrow: function (from, to) {
-    console.log(`DrawArrow from: ${from} to: ${to}`);
-    const svg = document.querySelector(".arrows"); // Get the SVG container
-
-    // Convert chess squares to matrix coordinates
+    const svg = document.querySelector(".arrows");
     const fromCoord = chessCom.chessNotationToMatrix(from);
     const toCoord = chessCom.chessNotationToMatrix(to);
-
-    // Define SVG coordinates based on the matrix coordinates
-    const fromX = fromCoord.col * 12.5 + 6.25; // Center of the square in x
-    const fromY = fromCoord.row * 12.5 + 6.25; // Center of the square in y
-    const toX = toCoord.col * 12.5 + 6.25; // Center of the square in x
-    const toY = toCoord.row * 12.5 + 6.25; // Center of the square in y
-
-    // Calculate angle for the arrow
+    const fromX = fromCoord.col * 12.5 + 6.25;
+    const fromY = fromCoord.row * 12.5 + 6.25;
+    const toX = toCoord.col * 12.5 + 6.25;
+    const toY = toCoord.row * 12.5 + 6.25;
     const angle = Math.atan2(toY - fromY, toX - fromX);
-
-    // Define the arrowhead size and line width
-    const arrowHeadSize = 3; // Smaller size of the arrowhead
-    const lineWidth = 1; // Thinner line width
-    const lineLengthAdjustment = arrowHeadSize * 0.75; // Adjust this value as needed for line length
-
-    // Calculate adjusted end points for the line
+    const arrowHeadSize = 3;
+    const lineWidth = 1;
+    const lineLengthAdjustment = arrowHeadSize * 0.75;
     const adjustedToX = toX - lineLengthAdjustment * Math.cos(angle);
     const adjustedToY = toY - lineLengthAdjustment * Math.sin(angle);
 
-    // Create a new <line> element for the arrow
     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-
-    // Set the attributes for the line
-    line.setAttribute("x1", fromX.toString());
-    line.setAttribute("y1", fromY.toString());
-    line.setAttribute("x2", adjustedToX.toString());
-    line.setAttribute("y2", adjustedToY.toString());
-    line.setAttribute("stroke", "rgb(150, 190, 70)"); // Line color
-    line.setAttribute("stroke-width", lineWidth.toString()); // Line width
-    line.setAttribute("opacity", "0.9"); // Line opacity
+    line.setAttribute("x1", fromX);
+    line.setAttribute("y1", fromY);
+    line.setAttribute("x2", adjustedToX);
+    line.setAttribute("y2", adjustedToY);
+    line.setAttribute("stroke", "rgb(150,190,70)");
+    line.setAttribute("stroke-width", lineWidth);
+    line.setAttribute("opacity", "0.9");
     line.setAttribute("data-arrow", `${from}${to}`);
-    line.setAttribute("id", `line-${from}${to}`); // Use 'line' in ID
-
-    // Append the line to the SVG container
     svg?.appendChild(line);
 
-    // Create a new <polygon> element for the arrowhead
     const arrowhead = document.createElementNS(
       "http://www.w3.org/2000/svg",
       "polygon"
     );
-
-    // Define points for the arrowhead
-    const arrowheadPoints = `
-          0,0 
-          -${arrowHeadSize},${arrowHeadSize / 2} 
-          -${arrowHeadSize},-${arrowHeadSize / 2}
-      `;
-
-    // Set the attributes for the arrowhead
-    arrowhead.setAttribute("points", arrowheadPoints);
-    arrowhead.setAttribute("fill", "rgb(150, 190, 70)"); // Color of the arrowhead
-    arrowhead.setAttribute("opacity", "0.9"); // Arrowhead opacity
-    arrowhead.setAttribute("data-arrowhead", `${from}${to}`);
-    arrowhead.setAttribute("id", `arrowhead-${from}${to}`); // Use 'arrowhead' in ID
-
-    // Position the arrowhead at the end of the line
+    arrowhead.setAttribute(
+      "points",
+      `0,0 -${arrowHeadSize},${arrowHeadSize / 2} -${arrowHeadSize},-${
+        arrowHeadSize / 2
+      }`
+    );
+    arrowhead.setAttribute("fill", "rgb(150,190,70)");
+    arrowhead.setAttribute("opacity", "0.9");
     arrowhead.setAttribute(
       "transform",
-      `translate(${toX}, ${toY}) rotate(${angle * (180 / Math.PI)})`
+      `translate(${toX},${toY}) rotate(${angle * (180 / Math.PI)})`
     );
-
-    // Append the arrowhead to the SVG container
     svg?.appendChild(arrowhead);
   },
 
   clearArrows: function () {
-    const svg = document.querySelector(".arrows"); // Get the SVG container
-    const arrows = svg?.querySelectorAll("line, polygon"); // Select all lines and polygons (arrows)
-
-    arrows?.forEach((arrow) => {
-      svg?.removeChild(arrow); // Remove each arrow from the SVG container
-    });
+    const svg = document.querySelector(".arrows");
+    const arrows = svg?.querySelectorAll("line, polygon");
+    arrows?.forEach((arrow) => svg?.removeChild(arrow));
   },
 };
 
@@ -333,75 +271,32 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
 });
 
 // --------------------
-// Popup function
+// Popup
 // --------------------
 chessCom.showRateLimitPopup = function () {
-  // Avoid creating multiple popups
   if (document.querySelector("#chess-limit-popup")) return;
-
-  // Overlay
   const overlay = document.createElement("div");
   overlay.id = "chess-limit-popup-overlay";
-  overlay.style.position = "fixed";
-  overlay.style.top = 0;
-  overlay.style.left = 0;
-  overlay.style.width = "100vw";
-  overlay.style.height = "100vh";
-  overlay.style.background = "rgba(0, 0, 0, 0.5)";
-  overlay.style.zIndex = 9999;
-  overlay.style.display = "flex";
-  overlay.style.justifyContent = "center";
-  overlay.style.alignItems = "center";
-
-  // Popup container
+  overlay.style =
+    "position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:9999;display:flex;justify-content:center;align-items:center;";
   const popup = document.createElement("div");
   popup.id = "chess-limit-popup";
-  popup.style.background = "#2f3437"; // Bot background color
-  popup.style.padding = "20px";
-  popup.style.borderRadius = "10px";
-  popup.style.boxShadow = "0 4px 15px rgba(0,0,0,0.5)";
-  popup.style.maxWidth = "400px";
-  popup.style.width = "90%";
-  popup.style.textAlign = "center";
-  popup.style.fontFamily = "Arial, sans-serif";
-  popup.style.color = "#fff";
-
+  popup.style =
+    "background:#2f3437;padding:20px;border-radius:10px;box-shadow:0 4px 15px rgba(0,0,0,0.5);max-width:400px;width:90%;text-align:center;font-family:Arial,sans-serif;color:#fff;";
   popup.innerHTML = `
-    <h2 style="margin-bottom:10px; color:#7fa650;">Daily Limit Reached</h2>
-    <p style="margin-bottom:15px; color:#ccc;">
-      You have reached your daily limit.
+    <h2 style="margin-bottom:10px;color:#7fa650;">Daily Limit Reached</h2>
+    <p style="margin-bottom:15px;color:#ccc;">
+      You have reached your daily limit.<br>
       Only <strong>monthly supporters</strong> get unlimited suggestions.
     </p>
-    <a href="https://ko-fi.com/nazmox" target="_blank" style="
-        display:inline-block;
-        padding:10px 20px;
-        background:#13C3FF;
-        color:#fff;
-        border-radius:5px;
-        text-decoration:none;
-        font-weight:600;
-        margin-bottom:10px;
-    ">Support on Ko-fi</a>
-    <br/>
-    <button id="chess-limit-popup-close" style="
-        padding:6px 12px;
-        border:none;
-        background:#7fa650;
-        color:#fff;
-        border-radius:5px;
-        cursor:pointer;
-        margin-top:10px;
-        font-weight:600;
-    ">Close</button>
+    <a href="https://ko-fi.com/nazmox" target="_blank"
+      style="display:inline-block;padding:10px 20px;background:#13C3FF;color:#fff;border-radius:5px;text-decoration:none;font-weight:600;margin-bottom:10px;">Support on Ko-fi</a><br/>
+    <button id="chess-limit-popup-close"
+      style="padding:6px 12px;border:none;background:#7fa650;color:#fff;border-radius:5px;cursor:pointer;margin-top:10px;font-weight:600;">Close</button>
   `;
-
   overlay.appendChild(popup);
   document.body.appendChild(overlay);
-
-  // Close button
   document
     .getElementById("chess-limit-popup-close")
-    .addEventListener("click", () => {
-      document.body.removeChild(overlay);
-    });
+    .addEventListener("click", () => overlay.remove());
 };

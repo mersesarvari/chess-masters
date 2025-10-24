@@ -4,7 +4,7 @@ console.log("Lichess content script loaded");
 const lychessOrg = {
   mycolor: "w",
   isActive: false,
-  intervalId: null,
+  observer: null,
   moves: [],
 
   showMoves: async function (moves) {
@@ -32,23 +32,6 @@ const lychessOrg = {
   Start: async function () {
     lychessOrg.getColor();
 
-    function boardHasChanged() {
-      const currentMoves = lychessOrg.checkMoves();
-      if (lychessOrg.moves.length < currentMoves.length) {
-        lychessOrg.clearArrows();
-        lychessOrg.moves = currentMoves;
-        return true;
-      } else {
-        return false;
-      }
-    }
-
-    const myTurn = (moves) => {
-      if (lychessOrg.mycolor === "w" && moves.length % 2 === 0) return true;
-      if (lychessOrg.mycolor === "b" && moves.length % 2 === 1) return true;
-      return false;
-    };
-
     if (lychessOrg.isActive) {
       console.log("Already active.");
       return;
@@ -57,25 +40,48 @@ const lychessOrg = {
     lychessOrg.isActive = true;
     console.log("[ChessSolve]: Started");
 
-    if (myTurn(lychessOrg.moves)) {
-      console.log("Show moves because this is my turn!");
-      await lychessOrg.showMoves(lychessOrg.moves);
+    const myTurn = () =>
+      (lychessOrg.mycolor === "w" && lychessOrg.moves.length % 2 === 0) ||
+      (lychessOrg.mycolor === "b" && lychessOrg.moves.length % 2 === 1);
+
+    // Select the real move container
+    const movesContainer = document.querySelector("l4x");
+    if (!movesContainer) {
+      console.warn("Move list container not found!");
+      return;
     }
 
-    lychessOrg.intervalId = setInterval(async function () {
-      if (boardHasChanged() && myTurn(lychessOrg.moves)) {
-        await lychessOrg.showMoves(lychessOrg.moves);
-      }
-    }, 100);
+    // Initial capture of moves
+    lychessOrg.moves = lychessOrg.checkMoves();
 
-    // ✅ start monitoring game over
+    // Setup MutationObserver for live move tracking
+    lychessOrg.observer = new MutationObserver(() => {
+      const currentMoves = lychessOrg.checkMoves();
+      if (currentMoves.length > lychessOrg.moves.length) {
+        const newMoves = currentMoves.slice(lychessOrg.moves.length);
+        lychessOrg.moves.push(...newMoves);
+        lychessOrg.clearArrows();
+
+        if (myTurn()) lychessOrg.showMoves(lychessOrg.moves);
+      }
+    });
+
+    lychessOrg.observer.observe(movesContainer, {
+      childList: true,
+      subtree: true,
+    });
+
+    // Immediately show move if it's our turn
+    if (myTurn()) await lychessOrg.showMoves(lychessOrg.moves);
+
+    // Start monitoring game over
     lychessOrg.saveOnCheckMate();
   },
 
   Stop: function () {
-    if (lychessOrg.intervalId) {
-      clearInterval(lychessOrg.intervalId);
-      lychessOrg.intervalId = null;
+    if (lychessOrg.observer) {
+      lychessOrg.observer.disconnect();
+      lychessOrg.observer = null;
     }
 
     lychessOrg.moves = [];
@@ -86,44 +92,35 @@ const lychessOrg = {
   },
 
   saveOnCheckMate: function () {
-    console.log("saveOnCheckMate called");
-
-    if (!lychessOrg.isActive) {
-      console.log("Lichess not active");
-      lychessOrg.moves = [];
-      return;
-    }
+    if (!lychessOrg.isActive) return;
 
     const checkInterval = setInterval(() => {
       const pageText = document.body.innerText || document.body.textContent;
-
       const blackWon = pageText?.includes("Black is victorious");
       const whiteWon = pageText?.includes("White is victorious");
       const gameAborted = pageText?.includes("Game aborted");
       const draw = pageText?.includes("Draw");
 
-      const isGameOver = blackWon || whiteWon || gameAborted || draw;
+      if (!(blackWon || whiteWon || gameAborted || draw)) return;
 
-      if (!isGameOver) return;
-
-      // ✅ Clear arrows
       lychessOrg.clearArrows();
 
-      // Determine winner
-      let winColor = "-"; // default draw/aborted
+      let winColor = "-";
       if (whiteWon) winColor = "w";
       else if (blackWon) winColor = "b";
 
-      // Fetch email and send to background
+      // Use live captured moves
+      const finalMoves = [...lychessOrg.moves];
+
       chrome.storage.local.get(["email"], (result) => {
         const email = result.email;
         if (!email) return;
 
         const gameObject = {
-          moves: lychessOrg.moves,
+          moves: finalMoves,
           winColor,
           myColor: lychessOrg.mycolor,
-          sourcee: "lichess.com",
+          source: "lichess.com",
           email,
         };
 
@@ -132,59 +129,40 @@ const lychessOrg = {
         chrome.runtime.sendMessage(
           { action: "saveGame", game: gameObject },
           (response) => {
-            if (response?.success) {
-              console.log("Background confirmed game saved!");
-            } else {
-              console.error("Background failed to save game");
-            }
+            if (response?.success) console.log("Game saved successfully!");
+            else console.error("Failed to save game");
           }
         );
       });
 
-      // ✅ Stop checking immediately after sending
       clearInterval(checkInterval);
       lychessOrg.moves = [];
-    }, 500); // check twice a second
+    }, 500);
   },
 
   checkMoves: function () {
-    const moveNodes = document.querySelectorAll("i5z");
-    const moves = [];
-
-    moveNodes.forEach((moveNode) => {
-      const whiteMove = moveNode?.nextElementSibling?.textContent?.trim();
-      const blackMove =
-        moveNode?.nextElementSibling?.nextElementSibling?.textContent?.trim();
-
-      if (whiteMove) moves.push(whiteMove);
-      if (blackMove) moves.push(blackMove);
-    });
-
-    return moves;
+    const moveNodes = document.querySelectorAll("l4x > kwdb");
+    return Array.from(moveNodes).map((node) => node.textContent.trim());
   },
 
   getColor: function () {
     const board = document.querySelector(".cg-wrap");
-    if (!board) {
-      console.error("Chess board not found.");
-      return;
-    }
-    if (board.className.includes("orientation-white")) {
-      lychessOrg.mycolor = "w";
-      console.log("You are with the white pieces.");
-    } else {
-      lychessOrg.mycolor = "b";
-      console.log("You are with the black pieces.");
-    }
+    if (!board) return console.error("Chess board not found.");
+    lychessOrg.mycolor = board.className.includes("orientation-white")
+      ? "w"
+      : "b";
+    console.log(
+      `You are playing ${
+        lychessOrg.mycolor === "w" ? "white" : "black"
+      } pieces.`
+    );
   },
 
   chessNotationToMatrix: function (chessNotation) {
     const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
     const file = chessNotation.charAt(0);
     const rank = parseInt(chessNotation.charAt(1));
-    const col = files.indexOf(file);
-    const row = 8 - rank;
-    return { row, col };
+    return { row: 8 - rank, col: files.indexOf(file) };
   },
 
   drawArrow: function (from, to) {
@@ -193,8 +171,7 @@ const lychessOrg = {
     const toCoord = lychessOrg.chessNotationToMatrix(to);
 
     const mapToSvg = (value) => -4 + (value / 7) * 8;
-    const isFlipped = lychessOrg.mycolor === "b";
-    const adjust = (v) => (isFlipped ? 7 - v : v);
+    const adjust = (v) => (lychessOrg.mycolor === "b" ? 7 - v : v);
 
     const fromX = mapToSvg(adjust(fromCoord.col));
     const fromY = mapToSvg(adjust(fromCoord.row));
@@ -214,30 +191,26 @@ const lychessOrg = {
     line.setAttribute("y1", fromY);
     line.setAttribute("x2", adjustedToX);
     line.setAttribute("y2", adjustedToY);
-    line.setAttribute("stroke", "rgb(16, 31, 163)");
+    line.setAttribute("stroke", "rgb(16,31,163)");
     line.setAttribute("stroke-width", lineWidth);
     line.setAttribute("opacity", "1");
-    line.setAttribute("data-arrow", `${from}${to}`);
-    line.setAttribute("id", `line-${from}${to}`);
     svg?.appendChild(line);
 
     const arrowhead = document.createElementNS(
       "http://www.w3.org/2000/svg",
       "polygon"
     );
-    const arrowheadPoints = `
-      0,0 
-      -${arrowHeadSize},${arrowHeadSize / 2} 
-      -${arrowHeadSize},-${arrowHeadSize / 2}
-    `;
-    arrowhead.setAttribute("points", arrowheadPoints);
-    arrowhead.setAttribute("fill", "rgb(16, 31, 163)");
+    arrowhead.setAttribute(
+      "points",
+      `0,0 -${arrowHeadSize},${arrowHeadSize / 2} -${arrowHeadSize},-${
+        arrowHeadSize / 2
+      }`
+    );
+    arrowhead.setAttribute("fill", "rgb(16,31,163)");
     arrowhead.setAttribute("opacity", "1");
-    arrowhead.setAttribute("data-arrowhead", `${from}${to}`);
-    arrowhead.setAttribute("id", `arrowhead-${from}${to}`);
     arrowhead.setAttribute(
       "transform",
-      `translate(${toX}, ${toY}) rotate(${angle * (180 / Math.PI)})`
+      `translate(${toX},${toY}) rotate(${angle * (180 / Math.PI)})`
     );
     svg?.appendChild(arrowhead);
   },
@@ -245,93 +218,67 @@ const lychessOrg = {
   clearArrows: function () {
     const svg = document.querySelector(".cg-shapes");
     const arrows = svg?.querySelectorAll("line, polygon");
-    arrows?.forEach((arrow) => svg?.removeChild(arrow));
+    arrows?.forEach((a) => svg?.removeChild(a));
   },
-};
 
-// --------------------
-// Popup function
-// --------------------
-lychessOrg.showRateLimitPopup = function () {
-  if (document.querySelector("#chess-limit-popup")) return;
+  showRateLimitPopup: function () {
+    if (document.querySelector("#chess-limit-popup")) return;
 
-  const overlay = document.createElement("div");
-  overlay.id = "chess-limit-popup-overlay";
-  Object.assign(overlay.style, {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    width: "100vw",
-    height: "100vh",
-    background: "rgba(0,0,0,0.5)",
-    zIndex: 9999,
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-  });
+    const overlay = document.createElement("div");
+    overlay.id = "chess-limit-popup-overlay";
+    Object.assign(overlay.style, {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100vw",
+      height: "100vh",
+      background: "rgba(0,0,0,0.5)",
+      zIndex: 9999,
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+    });
 
-  const popup = document.createElement("div");
-  popup.id = "chess-limit-popup";
-  Object.assign(popup.style, {
-    background: "#2f3437",
-    padding: "20px",
-    borderRadius: "10px",
-    boxShadow: "0 4px 15px rgba(0,0,0,0.5)",
-    maxWidth: "400px",
-    width: "90%",
-    textAlign: "center",
-    fontFamily: "Arial, sans-serif",
-    color: "#fff",
-  });
+    const popup = document.createElement("div");
+    popup.id = "chess-limit-popup";
+    Object.assign(popup.style, {
+      background: "#2f3437",
+      padding: "20px",
+      borderRadius: "10px",
+      boxShadow: "0 4px 15px rgba(0,0,0,0.5)",
+      maxWidth: "400px",
+      width: "90%",
+      textAlign: "center",
+      fontFamily: "Arial,sans-serif",
+      color: "#fff",
+    });
 
-  popup.innerHTML = `
-    <h2 style="margin-bottom:10px; color:#7fa650;">Daily Limit Reached</h2>
-    <p style="margin-bottom:15px; color:#ccc;">
-      You have reached your daily limit.<br>
-      Only <strong>monthly supporters</strong> get unlimited suggestions.
-    </p>
-    <a href="https://ko-fi.com/nazmox" target="_blank" style="
-      display:inline-block;
-      padding:10px 20px;
-      background:#13C3FF;
-      color:#fff;
-      border-radius:5px;
-      text-decoration:none;
-      font-weight:600;
-      margin-bottom:10px;
-    ">Support on Ko-fi</a><br/>
-    <button id="chess-limit-popup-close" style="
-      padding:6px 12px;
-      border:none;
-      background:#7fa650;
-      color:#fff;
-      border-radius:5px;
-      cursor:pointer;
-      margin-top:10px;
-      font-weight:600;
-    ">Close</button>
-  `;
+    popup.innerHTML = `
+      <h2 style="margin-bottom:10px; color:#7fa650;">Daily Limit Reached</h2>
+      <p style="margin-bottom:15px; color:#ccc;">
+        You have reached your daily limit.<br>
+        Only <strong>monthly supporters</strong> get unlimited suggestions.
+      </p>
+      <a href="https://ko-fi.com/nazmox" target="_blank" style="
+        display:inline-block; padding:10px 20px; background:#13C3FF; color:#fff;
+        border-radius:5px; text-decoration:none; font-weight:600; margin-bottom:10px;">Support on Ko-fi</a><br/>
+      <button id="chess-limit-popup-close" style="
+        padding:6px 12px; border:none; background:#7fa650; color:#fff; border-radius:5px;
+        cursor:pointer; margin-top:10px; font-weight:600;">Close</button>
+    `;
+    overlay.appendChild(popup);
+    document.body.appendChild(overlay);
 
-  overlay.appendChild(popup);
-  document.body.appendChild(overlay);
-
-  document
-    .getElementById("chess-limit-popup-close")
-    .addEventListener("click", () => document.body.removeChild(overlay));
+    document
+      .getElementById("chess-limit-popup-close")
+      .addEventListener("click", () => overlay.remove());
+  },
 };
 
 // --------------------
 // Chrome listeners
 // --------------------
 chrome.runtime.onMessage.addListener(async (request) => {
-  switch (request.action) {
-    case "startLichessOrg":
-      console.log("[LYCHESS]: Start command received");
-      await lychessOrg.Start();
-      break;
-    case "stop":
-      console.log("[LYCHESS]: Stop command received");
-      lychessOrg.Stop();
-      break;
-  }
+  if (request.action === "startLichessOrg") await lychessOrg.Start();
+  if (request.action === "stop") lychessOrg.Stop();
 });

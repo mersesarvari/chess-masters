@@ -8,7 +8,7 @@ const chessCom = {
   moves: [],
 
   // ✅ One place to control arrow thickness for ALL arrows
-  ARROW_WIDTH: 2,
+  ARROW_WIDTH: 1.3,
 
   // --------------------
   // Main: request + draw
@@ -245,30 +245,68 @@ const chessCom = {
   },
 
   // ✅ Only sets COLOR now. Width is constant for all arrows.
+  // ✅ Stable coloring based on LOSS from best move (centipawns)
   colorizeMovesByEval: function (moves, fen) {
     const side = chessCom.fenSideToMove(fen);
 
-    const numeric = moves
-      .map((m) => (typeof m.eval === "number" ? m.eval : Number(m.eval)))
-      .filter((e) => typeof e === "number" && !Number.isNaN(e));
+    // Extract numeric evals (assume eval is in pawns, e.g. 0.42)
+    const evals = moves.map((m) => {
+      const e = typeof m.eval === "number" ? m.eval : Number(m.eval);
+      return Number.isFinite(e) ? e : null;
+    });
 
+    // If no evals at all, fallback to green-ish
+    const numeric = evals.filter((x) => typeof x === "number");
     if (!numeric.length) {
       return moves.map((m) => ({ ...m, color: "rgb(150,190,70)" }));
     }
 
-    const best = side === "w" ? Math.max(...numeric) : Math.min(...numeric);
-    const worst = side === "w" ? Math.min(...numeric) : Math.max(...numeric);
-    const span = Math.max(0.001, Math.abs(best - worst));
+    // Best eval for the side to move
+    const bestEval = side === "w" ? Math.max(...numeric) : Math.min(...numeric);
 
-    return moves.map((m) => {
+    // Convert loss from best into centipawns (always >= 0)
+    // For white-to-move: loss = best - e
+    // For black-to-move: loss = e - best (because more negative is "better" for black)
+    const lossesCp = moves.map((m) => {
       const e = typeof m.eval === "number" ? m.eval : Number(m.eval);
+      if (!Number.isFinite(e)) return null;
 
-      if (!Number.isFinite(e)) {
+      const lossPawns = side === "w" ? bestEval - e : e - bestEval;
+      return Math.max(0, Math.round(lossPawns * 100)); // centipawns
+    });
+
+    // Thresholds (tune these)
+    const GREEN_CUTOFF = 15; // <= 0.15 pawn loss => basically equal
+    const YELLOW_AT = 80; // around 0.80 pawn loss => yellow-ish
+    const RED_AT = 250; // >= 2.5 pawn loss => red
+
+    // Map loss cp -> t in [0..1] where 1 = green, 0 = red
+    // We use a smooth curve so small losses stay green.
+    function lossToT(lossCp) {
+      if (lossCp <= GREEN_CUTOFF) return 1;
+
+      // normalize between GREEN_CUTOFF..RED_AT
+      const x = (lossCp - GREEN_CUTOFF) / (RED_AT - GREEN_CUTOFF);
+      const clamped = chessCom.clamp01(x);
+
+      // smoothstep curve: pushes "mostly green" range wider
+      const smooth = clamped * clamped * (3 - 2 * clamped);
+
+      // t: 1->0 as loss grows
+      return 1 - smooth;
+    }
+
+    return moves.map((m, i) => {
+      const lossCp = lossesCp[i];
+      if (typeof lossCp !== "number") {
         return { ...m, color: chessCom.gradientRYG(0) };
       }
 
-      const tRaw = side === "w" ? (e - worst) / span : (worst - e) / span;
-      const t = chessCom.clamp01(tRaw);
+      // Optional: show "equal moves" as same green
+      const t = lossToT(lossCp);
+
+      // Optional: if you want more distinct mid colors, bias a bit:
+      // const t = Math.pow(lossToT(lossCp), 0.9);
 
       return { ...m, color: chessCom.gradientRYG(t) };
     });

@@ -39,7 +39,7 @@ function getStartCommand() {
 
 async function login(email, password, sendResponse) {
   try {
-    const response = await fetch("https://www.chesssolve.com/api/login", {
+    const response = await fetch("https://chesssolve.com/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -186,7 +186,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
 
         try {
-          const res = await fetch("https://www.chesssolve.com/api/best", {
+          const res = await fetch("https://chesssolve.com/api/best", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -228,12 +228,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
           const data = await res.json();
 
-          if (data.from && data.to && data.fen) {
+          if (data.moves && data.fen) {
             sendResponse({
               success: true,
               fen: data.fen,
-              from: data.from,
-              to: data.to,
+              moves: data.moves,
             });
           } else {
             sendResponse({
@@ -259,7 +258,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       (async () => {
         try {
-          const res = await fetch("https://www.chesssolve.com/api/game", {
+          const res = await fetch("https://chesssolve.com/api/game", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(game),

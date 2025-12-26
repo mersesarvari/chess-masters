@@ -7,26 +7,40 @@ const chessCom = {
   observer: null,
   moves: [],
 
+  // ✅ One place to control arrow thickness for ALL arrows
+  ARROW_WIDTH: 2,
+
+  // --------------------
+  // Main: request + draw
+  // --------------------
   showMoves: async function (moves) {
     try {
       console.log("Asking for best move from the server...");
-      chrome.runtime.sendMessage(
-        { action: "getMove", moves: moves },
-        (response) => {
-          console.log("Response:", response);
+      chrome.runtime.sendMessage({ action: "getMove", moves }, (response) => {
+        console.log("Response:", response);
 
-          if (chrome.runtime.lastError) {
-            console.error("Message failed:", chrome.runtime.lastError.message);
-            return;
-          }
-
-          if (response && response.success && response.from && response.to) {
-            chessCom.drawArrow(response.from, response.to);
-          } else if (response && response.error?.includes("Daily limit")) {
-            chessCom.showRateLimitPopup();
-          }
+        if (chrome.runtime.lastError) {
+          console.error("Message failed:", chrome.runtime.lastError.message);
+          return;
         }
-      );
+
+        if (response && response.success && Array.isArray(response.moves)) {
+          chessCom.clearArrows();
+
+          const coloredMoves = chessCom.colorizeMovesByEval(
+            response.moves,
+            response.fen
+          );
+
+          // ✅ always draw with same width (triangles match)
+          coloredMoves.forEach((m) => {
+            if (!m.from || !m.to) return;
+            chessCom.drawArrow(m.from, m.to, m.color, chessCom.ARROW_WIDTH);
+          });
+        } else if (response && response.error?.includes("Daily limit")) {
+          chessCom.showRateLimitPopup();
+        }
+      });
     } catch (err) {
       console.error("Failed to send message:", err);
     }
@@ -47,7 +61,6 @@ const chessCom = {
       (chessCom.mycolor === "w" && chessCom.moves.length % 2 === 0) ||
       (chessCom.mycolor === "b" && chessCom.moves.length % 2 === 1);
 
-    // Wait for <wc-simple-move-list> to load
     const waitForMoveList = async () => {
       for (let i = 0; i < 20; i++) {
         const el = document.querySelector("wc-simple-move-list");
@@ -70,17 +83,16 @@ const chessCom = {
       return;
     }
 
-    // Initial capture
     chessCom.moves = chessCom.checkMoves().map((n) => n.moveText);
 
-    // Observe shadow DOM changes to capture moves live
     chessCom.observer = new MutationObserver(async () => {
       const currentMoves = chessCom.checkMoves().map((n) => n.moveText);
       if (currentMoves.length > chessCom.moves.length) {
         const newMoves = currentMoves.slice(chessCom.moves.length);
         chessCom.moves.push(...newMoves);
-        chessCom.clearArrows();
+
         if (myTurn()) await chessCom.showMoves(chessCom.moves);
+        else chessCom.clearArrows();
       }
     });
 
@@ -91,7 +103,6 @@ const chessCom = {
 
     if (myTurn()) await chessCom.showMoves(chessCom.moves);
 
-    // Start monitoring for game over
     chessCom.saveOnCheckMate();
   },
 
@@ -114,7 +125,7 @@ const chessCom = {
       const resultEl = document.querySelector(
         ".main-line-row.move-list-row.result-row .game-result"
       );
-      if (!resultEl) return; // Game not finished yet
+      if (!resultEl) return;
 
       const resultText = resultEl.textContent.trim();
       chessCom.clearArrows();
@@ -151,13 +162,6 @@ const chessCom = {
       clearInterval(interval);
       chessCom.moves = [];
     }, 500);
-  },
-
-  getWinner: function () {
-    const winnerElement = document.querySelector(".header-title-component");
-    return winnerElement
-      ? winnerElement.textContent.trim()
-      : "Winner not found";
   },
 
   checkMoves: function () {
@@ -198,66 +202,149 @@ const chessCom = {
     );
   },
 
+  // --------------------
+  // Eval -> color helpers
+  // --------------------
+  fenSideToMove: function (fen) {
+    const parts = String(fen || "").split(" ");
+    return parts[1] === "b" ? "b" : "w";
+  },
+
+  clamp01: function (x) {
+    return Math.max(0, Math.min(1, x));
+  },
+
+  lerp: function (a, b, t) {
+    return a + (b - a) * t;
+  },
+
+  rgb: function (r, g, b) {
+    return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+  },
+
+  gradientRYG: function (t) {
+    const red = [220, 60, 60];
+    const yellow = [240, 200, 70];
+    const green = [60, 200, 90];
+
+    if (t <= 0.5) {
+      const tt = t / 0.5;
+      return chessCom.rgb(
+        chessCom.lerp(red[0], yellow[0], tt),
+        chessCom.lerp(red[1], yellow[1], tt),
+        chessCom.lerp(red[2], yellow[2], tt)
+      );
+    } else {
+      const tt = (t - 0.5) / 0.5;
+      return chessCom.rgb(
+        chessCom.lerp(yellow[0], green[0], tt),
+        chessCom.lerp(yellow[1], green[1], tt),
+        chessCom.lerp(yellow[2], green[2], tt)
+      );
+    }
+  },
+
+  // ✅ Only sets COLOR now. Width is constant for all arrows.
+  colorizeMovesByEval: function (moves, fen) {
+    const side = chessCom.fenSideToMove(fen);
+
+    const numeric = moves
+      .map((m) => (typeof m.eval === "number" ? m.eval : Number(m.eval)))
+      .filter((e) => typeof e === "number" && !Number.isNaN(e));
+
+    if (!numeric.length) {
+      return moves.map((m) => ({ ...m, color: "rgb(150,190,70)" }));
+    }
+
+    const best = side === "w" ? Math.max(...numeric) : Math.min(...numeric);
+    const worst = side === "w" ? Math.min(...numeric) : Math.max(...numeric);
+    const span = Math.max(0.001, Math.abs(best - worst));
+
+    return moves.map((m) => {
+      const e = typeof m.eval === "number" ? m.eval : Number(m.eval);
+
+      if (!Number.isFinite(e)) {
+        return { ...m, color: chessCom.gradientRYG(0) };
+      }
+
+      const tRaw = side === "w" ? (e - worst) / span : (worst - e) / span;
+      const t = chessCom.clamp01(tRaw);
+
+      return { ...m, color: chessCom.gradientRYG(t) };
+    });
+  },
+
+  // --------------------
+  // Drawing
+  // --------------------
   chessNotationToMatrix: function (chessNotation) {
     const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
     const file = chessNotation.charAt(0);
-    const rank = parseInt(chessNotation.charAt(1));
+    const rank = parseInt(chessNotation.charAt(1), 10);
     return { row: 8 - rank, col: files.indexOf(file) };
   },
 
-  drawArrow: function (from, to) {
+  // ✅ Line + triangle head, triangle always matches constant width
+  drawArrow: function (from, to, color = "rgb(150,190,70)", lineWidth = 2) {
     const svg = document.querySelector(".arrows");
+    if (!svg) return;
+
     const fromCoord = chessCom.chessNotationToMatrix(from);
     const toCoord = chessCom.chessNotationToMatrix(to);
+
     const fromX = fromCoord.col * 12.5 + 6.25;
     const fromY = fromCoord.row * 12.5 + 6.25;
     const toX = toCoord.col * 12.5 + 6.25;
     const toY = toCoord.row * 12.5 + 6.25;
+
     const angle = Math.atan2(toY - fromY, toX - fromX);
-    const arrowHeadSize = 3;
-    const lineWidth = 1;
-    const lineLengthAdjustment = arrowHeadSize * 0.75;
-    const adjustedToX = toX - lineLengthAdjustment * Math.cos(angle);
-    const adjustedToY = toY - lineLengthAdjustment * Math.sin(angle);
+
+    // ✅ fixed relation to width (NOT dependent on eval anymore)
+    const headLen = 2.6 + lineWidth * 0.8;
+    const headWid = headLen * 0.75;
+
+    const endX = toX - Math.cos(angle) * headLen * 0.85;
+    const endY = toY - Math.sin(angle) * headLen * 0.85;
 
     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.setAttribute("x1", fromX);
-    line.setAttribute("y1", fromY);
-    line.setAttribute("x2", adjustedToX);
-    line.setAttribute("y2", adjustedToY);
-    line.setAttribute("stroke", "rgb(150,190,70)");
-    line.setAttribute("stroke-width", lineWidth);
+    line.setAttribute("x1", String(fromX));
+    line.setAttribute("y1", String(fromY));
+    line.setAttribute("x2", String(endX));
+    line.setAttribute("y2", String(endY));
+    line.setAttribute("stroke", color);
+    line.setAttribute("stroke-width", String(lineWidth));
+    line.setAttribute("stroke-linecap", "round");
     line.setAttribute("opacity", "0.9");
     line.setAttribute("data-arrow", `${from}${to}`);
-    svg?.appendChild(line);
+    svg.appendChild(line);
 
-    const arrowhead = document.createElementNS(
+    const points = `0,0 ${-headLen},${headWid / 2} ${-headLen},${-headWid / 2}`;
+
+    const head = document.createElementNS(
       "http://www.w3.org/2000/svg",
       "polygon"
     );
-    arrowhead.setAttribute(
-      "points",
-      `0,0 -${arrowHeadSize},${arrowHeadSize / 2} -${arrowHeadSize},-${
-        arrowHeadSize / 2
-      }`
-    );
-    arrowhead.setAttribute("fill", "rgb(150,190,70)");
-    arrowhead.setAttribute("opacity", "0.9");
-    arrowhead.setAttribute(
+    head.setAttribute("points", points);
+    head.setAttribute("fill", color);
+    head.setAttribute("opacity", "0.9");
+    head.setAttribute(
       "transform",
-      `translate(${toX},${toY}) rotate(${angle * (180 / Math.PI)})`
+      `translate(${toX},${toY}) rotate(${(angle * 180) / Math.PI})`
     );
-    svg?.appendChild(arrowhead);
+    head.setAttribute("data-arrow", `${from}${to}:head`);
+    svg.appendChild(head);
   },
 
   clearArrows: function () {
     const svg = document.querySelector(".arrows");
-    const arrows = svg?.querySelectorAll("line, polygon");
+    const arrows = svg?.querySelectorAll(
+      "line[data-arrow], polygon[data-arrow], path[data-arrow]"
+    );
     arrows?.forEach((arrow) => svg?.removeChild(arrow));
   },
 };
 
-chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener(async (request) => {
   switch (request.action) {
     case "startChessCom":
       console.log("[CHESS.COM]: Start command received");
@@ -275,14 +362,17 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
 // --------------------
 chessCom.showRateLimitPopup = function () {
   if (document.querySelector("#chess-limit-popup")) return;
+
   const overlay = document.createElement("div");
   overlay.id = "chess-limit-popup-overlay";
   overlay.style =
     "position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:9999;display:flex;justify-content:center;align-items:center;";
+
   const popup = document.createElement("div");
   popup.id = "chess-limit-popup";
   popup.style =
     "background:#2f3437;padding:20px;border-radius:10px;box-shadow:0 4px 15px rgba(0,0,0,0.5);max-width:400px;width:90%;text-align:center;font-family:Arial,sans-serif;color:#fff;";
+
   popup.innerHTML = `
     <h2 style="margin-bottom:10px;color:#7fa650;">Daily Limit Reached</h2>
     <p style="margin-bottom:15px;color:#ccc;">
@@ -294,8 +384,10 @@ chessCom.showRateLimitPopup = function () {
     <button id="chess-limit-popup-close"
       style="padding:6px 12px;border:none;background:#7fa650;color:#fff;border-radius:5px;cursor:pointer;margin-top:10px;font-weight:600;">Close</button>
   `;
+
   overlay.appendChild(popup);
   document.body.appendChild(overlay);
+
   document
     .getElementById("chess-limit-popup-close")
     .addEventListener("click", () => overlay.remove());

@@ -25,7 +25,7 @@ import {
 
 export default function App() {
   // VERSION
-  const version = "1.3.5";
+  const version = "1.4.0";
 
   const [versionOk, setVersionOk] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -51,7 +51,7 @@ export default function App() {
   useEffect(() => {
     const fetchVersion = async () => {
       try {
-        const res = await fetch("https://www.chesssolve.com/api/version", {
+        const res = await fetch("https://chesssolve.com/api/version", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ version }),
@@ -96,7 +96,7 @@ export default function App() {
     e: React.MouseEvent<HTMLAnchorElement, MouseEvent>
   ) => {
     e.preventDefault();
-    chrome.tabs.create({ url: "https://www.chesssolve.com/register" });
+    chrome.tabs.create({ url: "https://chesssolve.com/register" });
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -157,7 +157,7 @@ export default function App() {
               </p>
               <Button
                 onClick={() =>
-                  window.open("https://www.chesssolve.com//#download", "_blank")
+                  window.open("https://chesssolve.com//#download", "_blank")
                 }
                 className="w-full bg-red-600 hover:bg-red-700 text-white"
               >

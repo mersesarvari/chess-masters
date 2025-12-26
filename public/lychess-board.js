@@ -7,6 +7,12 @@ const lychessOrg = {
   observer: null,
   moves: [],
 
+  // ✅ Same idea as chess.com: constant width everywhere
+  ARROW_WIDTH: 0.12, // tune: 0.10–0.18 usually looks good
+
+  // --------------------
+  // Main: request + draw
+  // --------------------
   showMoves: async function (moves) {
     try {
       console.log("Asking for best move from the server...");
@@ -16,13 +22,41 @@ const lychessOrg = {
           return;
         }
 
-        if (response && response.success && response.from && response.to) {
-          lychessOrg.drawArrow(response.from, response.to);
-        } else if (response && response.error?.includes("Daily limit")) {
-          lychessOrg.showRateLimitPopup();
-        } else {
-          console.warn("Invalid move response:", response);
+        // ✅ UPDATED: support multi-move response like chess.com
+        if (response && response.success && Array.isArray(response.moves)) {
+          lychessOrg.clearArrows();
+
+          const coloredMoves = lychessOrg.colorizeMovesByEval(
+            response.moves,
+            response.fen
+          );
+
+          coloredMoves.forEach((m) => {
+            if (!m.from || !m.to) return;
+            lychessOrg.drawArrow(m.from, m.to, m.color, lychessOrg.ARROW_WIDTH);
+          });
+
+          return;
         }
+
+        // Backwards-compat: old API that returns {from,to}
+        if (response && response.success && response.from && response.to) {
+          lychessOrg.clearArrows();
+          lychessOrg.drawArrow(
+            response.from,
+            response.to,
+            "rgb(150,190,70)",
+            lychessOrg.ARROW_WIDTH
+          );
+          return;
+        }
+
+        if (response && response.error?.includes("Daily limit")) {
+          lychessOrg.showRateLimitPopup();
+          return;
+        }
+
+        console.warn("Invalid move response:", response);
       });
     } catch (err) {
       console.error("Failed to send message:", err);
@@ -60,9 +94,9 @@ const lychessOrg = {
       if (currentMoves.length > lychessOrg.moves.length) {
         const newMoves = currentMoves.slice(lychessOrg.moves.length);
         lychessOrg.moves.push(...newMoves);
-        lychessOrg.clearArrows();
 
         if (myTurn()) lychessOrg.showMoves(lychessOrg.moves);
+        else lychessOrg.clearArrows();
       }
     });
 
@@ -71,10 +105,8 @@ const lychessOrg = {
       subtree: true,
     });
 
-    // Immediately show move if it's our turn
     if (myTurn()) await lychessOrg.showMoves(lychessOrg.moves);
 
-    // Start monitoring game over
     lychessOrg.saveOnCheckMate();
   },
 
@@ -109,7 +141,6 @@ const lychessOrg = {
       if (whiteWon) winColor = "w";
       else if (blackWon) winColor = "b";
 
-      // Use live captured moves
       const finalMoves = [...lychessOrg.moves];
 
       chrome.storage.local.get(["email"], (result) => {
@@ -158,69 +189,171 @@ const lychessOrg = {
     );
   },
 
+  // --------------------
+  // Eval -> color helpers (same logic as chess.com)
+  // --------------------
+  fenSideToMove: function (fen) {
+    const parts = String(fen || "").split(" ");
+    return parts[1] === "b" ? "b" : "w";
+  },
+
+  clamp01: function (x) {
+    return Math.max(0, Math.min(1, x));
+  },
+
+  lerp: function (a, b, t) {
+    return a + (b - a) * t;
+  },
+
+  rgb: function (r, g, b) {
+    return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+  },
+
+  gradientRYG: function (t) {
+    const red = [220, 60, 60];
+    const yellow = [240, 200, 70];
+    const green = [60, 200, 90];
+
+    if (t <= 0.5) {
+      const tt = t / 0.5;
+      return lychessOrg.rgb(
+        lychessOrg.lerp(red[0], yellow[0], tt),
+        lychessOrg.lerp(red[1], yellow[1], tt),
+        lychessOrg.lerp(red[2], yellow[2], tt)
+      );
+    } else {
+      const tt = (t - 0.5) / 0.5;
+      return lychessOrg.rgb(
+        lychessOrg.lerp(yellow[0], green[0], tt),
+        lychessOrg.lerp(yellow[1], green[1], tt),
+        lychessOrg.lerp(yellow[2], green[2], tt)
+      );
+    }
+  },
+
+  colorizeMovesByEval: function (moves, fen) {
+    const side = lychessOrg.fenSideToMove(fen);
+
+    const numeric = moves
+      .map((m) => (typeof m.eval === "number" ? m.eval : Number(m.eval)))
+      .filter((e) => typeof e === "number" && !Number.isNaN(e));
+
+    if (!numeric.length) {
+      return moves.map((m) => ({ ...m, color: "rgb(150,190,70)" }));
+    }
+
+    const best = side === "w" ? Math.max(...numeric) : Math.min(...numeric);
+    const worst = side === "w" ? Math.min(...numeric) : Math.max(...numeric);
+    const span = Math.max(0.001, Math.abs(best - worst));
+
+    return moves.map((m) => {
+      const e = typeof m.eval === "number" ? m.eval : Number(m.eval);
+
+      if (!Number.isFinite(e)) {
+        return { ...m, color: lychessOrg.gradientRYG(0) };
+      }
+
+      const tRaw = side === "w" ? (e - worst) / span : (worst - e) / span;
+      const t = lychessOrg.clamp01(tRaw);
+
+      return { ...m, color: lychessOrg.gradientRYG(t) };
+    });
+  },
+
+  // --------------------
+  // Drawing (line + triangle head, like chess.com)
+  // --------------------
   chessNotationToMatrix: function (chessNotation) {
     const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
     const file = chessNotation.charAt(0);
-    const rank = parseInt(chessNotation.charAt(1));
+    const rank = parseInt(chessNotation.charAt(1), 10);
     return { row: 8 - rank, col: files.indexOf(file) };
   },
 
-  drawArrow: function (from, to) {
-    const svg = document.querySelector(".cg-shapes");
-    const fromCoord = lychessOrg.chessNotationToMatrix(from);
-    const toCoord = lychessOrg.chessNotationToMatrix(to);
+  // Convert board coords to lichess SVG coords (-4..4). Lichess flips by orientation.
+  boardToSvgXY: function (square) {
+    const { row, col } = lychessOrg.chessNotationToMatrix(square);
 
-    const mapToSvg = (value) => -4 + (value / 7) * 8;
+    const mapToSvg = (value) => -4 + (value / 7) * 8; // 0..7 -> -4..4
     const adjust = (v) => (lychessOrg.mycolor === "b" ? 7 - v : v);
 
-    const fromX = mapToSvg(adjust(fromCoord.col));
-    const fromY = mapToSvg(adjust(fromCoord.row));
-    const toX = mapToSvg(adjust(toCoord.col));
-    const toY = mapToSvg(adjust(toCoord.row));
+    const x = mapToSvg(adjust(col));
+    const y = mapToSvg(adjust(row));
+    return { x, y };
+  },
+
+  drawArrow: function (from, to, color = "rgb(150,190,70)", lineWidth = 0.12) {
+    const svg = document.querySelector(".cg-shapes");
+    if (!svg) return;
+
+    const a = lychessOrg.boardToSvgXY(from);
+    const b = lychessOrg.boardToSvgXY(to);
+
+    const fromX = a.x;
+    const fromY = a.y;
+    const toX = b.x;
+    const toY = b.y;
 
     const angle = Math.atan2(toY - fromY, toX - fromX);
-    const arrowHeadSize = 0.3;
-    const lineWidth = 0.1;
-    const lineLengthAdjustment = arrowHeadSize * 0.75;
 
-    const adjustedToX = toX - lineLengthAdjustment * Math.cos(angle);
-    const adjustedToY = toY - lineLengthAdjustment * Math.sin(angle);
+    // Triangle sizing: tied only to lineWidth so everything matches
+    // NOTE: lichess SVG units are small. Keep head tiny.
+    const headLen = 0.35 + lineWidth * 1.8;
+    const headWid = headLen * 0.75;
 
+    // Shorten line so it doesn't go under triangle
+    const endX = toX - Math.cos(angle) * headLen * 0.85;
+    const endY = toY - Math.sin(angle) * headLen * 0.85;
+
+    // LINE
     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.setAttribute("x1", fromX);
-    line.setAttribute("y1", fromY);
-    line.setAttribute("x2", adjustedToX);
-    line.setAttribute("y2", adjustedToY);
-    line.setAttribute("stroke", "rgb(16,31,163)");
-    line.setAttribute("stroke-width", lineWidth);
+    line.setAttribute("x1", String(fromX));
+    line.setAttribute("y1", String(fromY));
+    line.setAttribute("x2", String(endX));
+    line.setAttribute("y2", String(endY));
+    line.setAttribute("stroke", color);
+    line.setAttribute("stroke-width", String(lineWidth));
+    line.setAttribute("stroke-linecap", "round");
     line.setAttribute("opacity", "1");
-    svg?.appendChild(line);
+    line.setAttribute("data-arrow", `${from}${to}`);
+    svg.appendChild(line);
 
-    const arrowhead = document.createElementNS(
+    // TRIANGLE HEAD
+    const points = `0,0 ${-headLen},${headWid / 2} ${-headLen},${-headWid / 2}`;
+
+    const head = document.createElementNS(
       "http://www.w3.org/2000/svg",
       "polygon"
     );
-    arrowhead.setAttribute(
-      "points",
-      `0,0 -${arrowHeadSize},${arrowHeadSize / 2} -${arrowHeadSize},-${
-        arrowHeadSize / 2
-      }`
-    );
-    arrowhead.setAttribute("fill", "rgb(16,31,163)");
-    arrowhead.setAttribute("opacity", "1");
-    arrowhead.setAttribute(
+    head.setAttribute("points", points);
+    head.setAttribute("fill", color);
+    head.setAttribute("opacity", "1");
+    head.setAttribute(
       "transform",
-      `translate(${toX},${toY}) rotate(${angle * (180 / Math.PI)})`
+      `translate(${toX},${toY}) rotate(${(angle * 180) / Math.PI})`
     );
-    svg?.appendChild(arrowhead);
+    head.setAttribute("data-arrow", `${from}${to}:head`);
+    svg.appendChild(head);
   },
 
   clearArrows: function () {
     const svg = document.querySelector(".cg-shapes");
-    const arrows = svg?.querySelectorAll("line, polygon");
-    arrows?.forEach((a) => svg?.removeChild(a));
+    const arrows = svg?.querySelectorAll(
+      "line[data-arrow], polygon[data-arrow], path[data-arrow], line, polygon"
+    );
+
+    // Keep it safe: remove our own first (data-arrow). If none, it still clears.
+    arrows?.forEach((a) => {
+      // If it's not inside svg anymore, skip
+      try {
+        svg.removeChild(a);
+      } catch {}
+    });
   },
 
+  // --------------------
+  // Popup
+  // --------------------
   showRateLimitPopup: function () {
     if (document.querySelector("#chess-limit-popup")) return;
 

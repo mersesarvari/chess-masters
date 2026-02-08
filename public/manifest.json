@@ -11,11 +11,11 @@
   "content_scripts": [
     {
       "matches": ["*://*.chess.com/*"],
-      "js": ["chess-board.js"]
+      "js": ["chess-base.js", "chess-board.js"]
     },
     {
       "matches": ["*://*.lichess.org/*"],
-      "js": ["lychess-board.js"]
+      "js": ["chess-base.js", "lychess-board.js"]
     }
   ],
   "action": {

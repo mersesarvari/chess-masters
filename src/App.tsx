@@ -25,7 +25,7 @@ import {
 
 export default function App() {
   // VERSION
-  const version = "1.4.1";
+  const version = "1.4.2";
 
   const [versionOk, setVersionOk] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -81,10 +81,10 @@ export default function App() {
             if (chrome.runtime.lastError) {
               console.warn(
                 "No content script ready:",
-                chrome.runtime.lastError.message
+                chrome.runtime.lastError.message,
               );
             }
-          }
+          },
         );
       });
 
@@ -93,7 +93,7 @@ export default function App() {
   }, [isBotRunning, isLoggedIn]);
 
   const handleRegisterClick = (
-    e: React.MouseEvent<HTMLAnchorElement, MouseEvent>
+    e: React.MouseEvent<HTMLAnchorElement, MouseEvent>,
   ) => {
     e.preventDefault();
     chrome.tabs.create({ url: "https://chesssolve.com/register" });
@@ -111,7 +111,7 @@ export default function App() {
         } else {
           setLoginError("Login failed. Please try again.");
         }
-      }
+      },
     );
   };
 

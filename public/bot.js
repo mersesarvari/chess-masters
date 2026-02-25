@@ -39,7 +39,7 @@ function getStartCommand() {
 
 async function login(email, password, sendResponse) {
   try {
-    const response = await fetch("https://chesssolve.com/api/login", {
+    const response = await fetch("https://www.chesssolve.com/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -48,7 +48,7 @@ async function login(email, password, sendResponse) {
 
     if (response.ok && data.token) {
       // Store email + token instead of password
-      //await chrome.storage.local.set({ email, token: data.token });
+      await chrome.storage.local.set({ email, token: data.token });
       console.log("Login successful");
       sendResponse({
         status: "Login successful",
@@ -186,7 +186,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
 
         try {
-          const res = await fetch("https://chesssolve.com/api/best", {
+          const res = await fetch("https://www.chesssolve.com/api/best", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -210,7 +210,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                       action: "rateLimitHit",
                     });
                   }
-                }
+                },
               );
 
               sendResponse({
@@ -258,7 +258,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       (async () => {
         try {
-          const res = await fetch("https://chesssolve.com/api/game", {
+          const res = await fetch("https://www.chesssolve.com/api/game", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(game),

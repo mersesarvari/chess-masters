@@ -25,7 +25,7 @@ import {
 
 export default function App() {
   // VERSION
-  const version = "1.4.2";
+  const version = "1.5.0";
 
   const [versionOk, setVersionOk] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -51,7 +51,7 @@ export default function App() {
   useEffect(() => {
     const fetchVersion = async () => {
       try {
-        const res = await fetch("https://chesssolve.com/api/version", {
+        const res = await fetch("https://www.chesssolve.com/api/version", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ version }),

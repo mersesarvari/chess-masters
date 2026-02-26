@@ -40,7 +40,7 @@ function createChessBot(config) {
 
             const coloredMoves = bot.colorizeMovesByEval(
               response.moves,
-              response.fen
+              response.fen,
             );
 
             coloredMoves.forEach((m) => {
@@ -144,7 +144,7 @@ function createChessBot(config) {
             (res) => {
               if (res?.success) console.log("Game saved successfully!");
               else console.error("Failed to save game.");
-            }
+            },
           );
         });
 
@@ -183,41 +183,37 @@ function createChessBot(config) {
         return bot.rgb(
           bot.lerp(red[0], yellow[0], tt),
           bot.lerp(red[1], yellow[1], tt),
-          bot.lerp(red[2], yellow[2], tt)
+          bot.lerp(red[2], yellow[2], tt),
         );
       } else {
         const tt = (t - 0.5) / 0.5;
         return bot.rgb(
           bot.lerp(yellow[0], green[0], tt),
           bot.lerp(yellow[1], green[1], tt),
-          bot.lerp(yellow[2], green[2], tt)
+          bot.lerp(yellow[2], green[2], tt),
         );
       }
     },
 
     colorizeMovesByEval: function (moves, fen) {
-      const side = bot.fenSideToMove(fen);
-
       const evals = moves.map((m) => {
         const e = typeof m.eval === "number" ? m.eval : Number(m.eval);
         return Number.isFinite(e) ? e : null;
       });
 
-      const numeric = evals.filter((x) => typeof x === "number");
+      const numeric = evals.filter((x) => x !== null);
       if (!numeric.length) {
         return moves.map((m) => ({ ...m, color: "rgb(150,190,70)" }));
       }
 
-      const bestEval =
-        side === "w" ? Math.max(...numeric) : Math.min(...numeric);
-      const worstEval =
-        side === "w" ? Math.min(...numeric) : Math.max(...numeric);
+      const bestEval = Math.max(...numeric);
+      const worstEval = Math.min(...numeric);
 
       const lossesCp = moves.map((m) => {
         const e = typeof m.eval === "number" ? m.eval : Number(m.eval);
         if (!Number.isFinite(e)) return null;
 
-        const lossPawns = side === "w" ? bestEval - e : e - bestEval;
+        const lossPawns = bestEval - e;
         return Math.max(0, Math.round(lossPawns * 100));
       });
 
@@ -273,7 +269,7 @@ function createChessBot(config) {
 
       const line = document.createElementNS(
         "http://www.w3.org/2000/svg",
-        "line"
+        "line",
       );
       line.setAttribute("x1", String(fromPt.x));
       line.setAttribute("y1", String(fromPt.y));
@@ -292,14 +288,14 @@ function createChessBot(config) {
 
       const head = document.createElementNS(
         "http://www.w3.org/2000/svg",
-        "polygon"
+        "polygon",
       );
       head.setAttribute("points", points);
       head.setAttribute("fill", color);
       head.setAttribute("opacity", config.arrowOpacity);
       head.setAttribute(
         "transform",
-        `translate(${toPt.x},${toPt.y}) rotate(${(angle * 180) / Math.PI})`
+        `translate(${toPt.x},${toPt.y}) rotate(${(angle * 180) / Math.PI})`,
       );
       head.setAttribute("data-arrow", `${from}${to}:head`);
       svg.appendChild(head);
@@ -308,7 +304,7 @@ function createChessBot(config) {
     clearArrows: function () {
       const svg = document.querySelector(config.svgSelector);
       const arrows = svg?.querySelectorAll(
-        "line[data-arrow], polygon[data-arrow], path[data-arrow]"
+        "line[data-arrow], polygon[data-arrow], path[data-arrow]",
       );
       arrows?.forEach((a) => {
         try {
